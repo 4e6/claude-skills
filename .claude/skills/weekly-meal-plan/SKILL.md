@@ -60,6 +60,8 @@ Auth fallback (rare): if any TP call fails on auth, run `tp_auth_status` then `t
 
 If TrainingPeaks returns nothing for the week (rest week, off-season, MCP down), ask the user to describe the week's sessions before continuing.
 
+**Race weeks — get the race distance.** If the week contains a workout titled `RACE` / `PRE-RACE` / `WARM-UP | …` on the final day, treat it as race week. The race itself is normally on the TrainingPeaks calendar as an event — call `tp_get_next_event` (and `tp_get_focus_event` if relevant) to pull the race name + distance directly. **Don't infer distance from the workout description** — the coach's notes typically list multiple distance options (e.g. *"In case its a 10K Race … Half Marathon … Marathon …"*) and don't tell you which one applies. If the event lookup doesn't return a clear distance, ask the user once: *"What's the distance for Sunday's race?"* before building the plan. Distance drives Saturday carb-load target (~5–7 g/kg for 10K, ~7–10 g/kg for HM+), in-race fueling (10K rarely needs gels; HM = 2–3 gels + isotonic; Marathon = continuous fueling), and post-race recovery depth.
+
 ### A3. Capture the fridge inventory
 
 - If the user already pasted a list, use it.
@@ -227,6 +229,26 @@ python3 ~/.claude/skills/weekly-meal-plan/scripts/md-to-pdf.py \
 The script prints the absolute output path on success. Required tools: `chromium` and the `markdown` Python module — both already present. If the script fails, surface the stderr to the user; do not silently fall back.
 
 The renderer is **not** a plain markdown-to-HTML dump — it parses the schema in A4 directly and lays it out as a styled PDF (blue/orange palette, Playfair Display titles, cover page, day cards, multi-column shopping list, one-recipe-per-page with numbered steps). The look is modeled on the "2023-01 Meal Template.pdf" the user has on Drive. **Don't change the section headings or bullet shapes in A4** — the parser depends on them; changing them will silently drop content from the PDF. Google Fonts is fetched at render time for best typography; if offline, the layout still works using local serif/sans fallbacks.
+
+### A7.5. Clean up previous weeks' artifacts
+
+Once the new PDF exists locally, remove old PDFs and image directories from `plans/` — but keep every `.md` (those are the historical record and the cache that actions B–F read).
+
+```bash
+WEEK_STEM="meal-plan-week-{month}-{day}-{year}"
+PLANS_DIR=~/.claude/skills/weekly-meal-plan/plans
+
+find "$PLANS_DIR" -maxdepth 1 -type f -name 'meal-plan-week-*.pdf' \
+    ! -name "${WEEK_STEM}.pdf" -delete
+
+find "$PLANS_DIR/images" -mindepth 1 -maxdepth 1 -type d \
+    ! -name "week-{month}-{day}-{year}" -exec rm -rf {} +
+```
+
+Notes:
+- Only `.pdf` files and `images/week-*/` directories are removed. `.md` files are never touched.
+- Use the same `{month}-{day}-{year}` slug from A6 so the just-created artifacts survive.
+- If `plans/images/` doesn't exist (image generation was skipped), the second `find` is a no-op — that's fine.
 
 ### A8. Upload to Google Drive (via rclone)
 
