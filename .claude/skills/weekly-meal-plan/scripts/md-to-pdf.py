@@ -197,7 +197,6 @@ def parse_recipe_body(lines):
     ingredients = []
     steps = []
     note_chunks = []
-    tags = []
     nutrition = {}
     times = {}
     image_override = {}
@@ -208,9 +207,7 @@ def parse_recipe_body(lines):
         if not line:
             continue
 
-        m_tags = re.match(r"^\*\*Tags:\*\*\s*(.+)$", line)
-        if m_tags:
-            tags = [t.strip() for t in re.split(r"[,/]", m_tags.group(1)) if t.strip()]
+        if re.match(r"^\*\*Tags:\*\*", line):
             continue
         m_nutr = re.match(r"^\*\*Per serving:\*\*\s*(.+)$", line)
         if m_nutr:
@@ -256,7 +253,6 @@ def parse_recipe_body(lines):
         "ingredients": ingredients,
         "steps": steps,
         "note": " ".join(note_chunks),
-        "tags": tags,
         "nutrition": nutrition,
         "times": times,
         "image_override": image_override,
@@ -884,7 +880,7 @@ ul, ol { padding: 0; margin: 0; list-style: none; }
 
 .recipes-toc a:hover { text-decoration: underline; }
 
-/* Recipe tag chips & nutrition table (matches the Kinetic template). */
+/* Recipe nutrition table (matches the Kinetic template). */
 
 .recipe-footer {
     margin-top: auto;
@@ -893,27 +889,6 @@ ul, ol { padding: 0; margin: 0; list-style: none; }
     flex-direction: column;
     align-items: center;
     gap: 0.25cm;
-}
-
-.recipe-tags {
-    display: flex;
-    gap: 0.12cm;
-    flex-wrap: wrap;
-    justify-content: center;
-}
-
-.tag-chip {
-    display: inline-block;
-    background: #1a1a1a;
-    color: #fff;
-    padding: 0.09cm 0.32cm;
-    font-size: 8.5pt;
-    font-weight: 700;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-    font-family: 'Source Sans 3', 'Liberation Sans', sans-serif;
-    min-width: 0.85cm;
-    text-align: center;
 }
 
 .nutrition {
@@ -1141,23 +1116,15 @@ def render_recipes(plan, images_dir):
 
 
 def render_recipe_footer(s):
-    """Render tag chips + nutrition table for a recipe. Returns '' if no data."""
-    has_tags = bool(s.get("tags"))
+    """Render the nutrition table for a recipe. Returns '' if no data."""
     nutrition = s.get("nutrition") or {}
     times = s.get("times") or {}
     has_table = bool(nutrition) or bool(times)
 
-    if not has_tags and not has_table:
+    if not has_table:
         return ""
 
     parts = ['<div class="recipe-footer">']
-
-    if has_tags:
-        chips = "".join(
-            f'<span class="tag-chip">{html_lib.escape(t)}</span>'
-            for t in s["tags"]
-        )
-        parts.append(f'<div class="recipe-tags">{chips}</div>')
 
     if has_table:
         def cell(v):

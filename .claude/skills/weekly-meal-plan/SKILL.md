@@ -135,11 +135,10 @@ Follow the existing schema **exactly** — preserve section order and headings s
 
 #### Per-recipe metadata (required for the PDF nutrition block)
 
-Every `#### {Dish}` heading must be followed by three lines, before the `**Ingredients**` block, so the renderer can show tag chips and a Prep/Cook/Kcal/Fats/Carbs/Protein/Fibre table at the bottom of each recipe page:
+Every `#### {Dish}` heading must be followed by two lines, before the `**Ingredients**` block, so the renderer can show a Prep/Cook/Kcal/Fats/Carbs/Protein/Fibre table at the bottom of each recipe page:
 
 ```markdown
 #### Bolognese with pasta + broccoli
-**Tags:** HP, MP, DF
 **Per serving:** 810 kcal · 40 g protein · 31 g fat · 91 g carbs · 5 g fibre
 **Time:** 10 min prep · 30 min cook
 
@@ -148,10 +147,9 @@ Every `#### {Dish}` heading must be followed by three lines, before the `**Ingre
 ```
 
 Field rules:
-- **Tags** — comma-separated abbreviations from this set: `GF` (gluten free), `DF` (dairy free), `LC` (low carb, <20 g/serve), `MP` (meal prep / freezer friendly), `HP` (high protein, ≥20 g/serve), `V` (vegetarian), `Q` (quick, ≤30 min total), `N` (contains nuts). Apply them by composition — e.g. an oats+walnuts breakfast is `V, N, Q`.
 - **Per serving** — kcal first, then protein/fat/carbs/fibre. Units `g` are optional but recommended. Separators can be `·`, `•`, or `|`. Values are estimates — fine to round to 5 kcal / 1 g. For multi-serving recipes (bolognese, etc.), values are **per serving**, not for the whole pot.
-- **Time** — `N min prep · N min cook`. Either field can be omitted; `0 min cook` is valid for no-cook dishes. Total time is what drives the `Q` tag.
-- For reference recipes (`*See Wednesday — ...*`), still include all three lines — values reflect the variant on that day (e.g. Friday's "Big oats bowl" has higher kcal than Wednesday's oats).
+- **Time** — `N min prep · N min cook`. Either field can be omitted; `0 min cook` is valid for no-cook dishes.
+- For reference recipes (`*See Wednesday — ...*`), still include both lines — values reflect the variant on that day (e.g. Friday's "Big oats bowl" has higher kcal than Wednesday's oats).
 
 Optional fourth line — **only add it if auto-detection picks the wrong category** (which it almost never does; skip it by default):
 
