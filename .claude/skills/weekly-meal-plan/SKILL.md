@@ -142,9 +142,11 @@ Every `#### {Dish}` heading must be followed by two lines, before the `**Ingredi
 **Per serving:** 810 kcal · 40 g protein · 31 g fat · 91 g carbs · 5 g fibre
 **Time:** 10 min prep · 30 min cook
 
-**Ingredients (4 servings — reserve half for Sunday)**
+**Ingredients (4 servings — 2 Thu dinner, 2 Sun lunch)**
 - ...
 ```
+
+When a recipe is batch-cooked, the serving line must name where every serving goes (see the portion-conservation rule below) — not just "reserve half".
 
 Field rules:
 - **Per serving** — kcal first, then protein/fat/carbs/fibre. Units `g` are optional but recommended. Separators can be `·`, `•`, or `|`. Values are estimates — fine to round to 5 kcal / 1 g. For multi-serving recipes (bolognese, etc.), values are **per serving**, not for the whole pot.
@@ -168,6 +170,10 @@ This controls the category-themed preview banner at the top of the recipe page (
 
 - **Carb load tracks training load.** Use planned TSS first to rank the days (highest TSS = biggest fuel day); fall back to session type/duration only when TSS isn't available. Hard days get bigger carb portions, in-session fuel (bananas, dates, energy bars, isotonic), and post-session recovery (chocolate milk). Easy / recovery days are lighter — fewer carbs, no sports drinks, no recovery shake.
 - **Reuse fridge items.** Where a meal uses something already in the fridge, append `*(use what's in fridge)*` to the bullet.
+- **Every cooked portion gets eaten within the week.** This is a hard rule — cooked food that isn't scheduled spoils. When a recipe yields more than one serving (batch soups, stews, bolognese, chili, cooked grains, roasted veg, etc.), every serving must map to a specific meal slot inside the same Mon→Sun week. Make the mapping explicit in two places:
+  - In the **Meal Plan** bullets: the cooking day says how many portions are made and eaten now, and each later day that finishes the leftovers references it. E.g. Tuesday dinner `Lentil soup (cook 2 — eat 1, reserve 1)` and Thursday lunch `Lentil soup (leftover from Tue)`.
+  - In the recipe's serving line: spell out the allocation, e.g. `**Ingredients (2 servings — 1 Tue dinner, 1 Thu lunch)**`.
+  - Pick batch sizes that divide cleanly into slots you actually have. If a dish only fits one meal this week, cook **one** serving — don't default to 2. Perishable leftovers (cooked fish, leafy salads, dressed dishes) should be consumed within ~2–3 days of cooking; don't park a Monday leftover on Sunday.
 - **Bilingual shopping list.** Each item: English name + Portuguese name in parentheses, e.g. `Chicken breasts (peito de frango) — 1 kg`. Quantities should scale with the week's training load (more bananas/dates/energy bars/chocolate milk on big aerobic weeks).
 - **Reference supermarkets.** Pingo Doce, Continente, Lidl. The closing note typically flags which is cheapest for specific categories.
 - **Athlete is a triathlete** (swim/bike/run + core/plyometrics). Don't suggest meals that conflict with that (e.g. very heavy/fatty pre-session meals).
@@ -182,7 +188,11 @@ This controls the category-themed preview banner at the top of the recipe page (
 
 ### A5. Final consistency pass
 
-Before declaring the plan done, walk every dish across all seven days and confirm every ingredient is either in **Already in the Fridge** or on the **Shopping List**. Add anything missing — named herbs, spices, condiments — including training-load-scaled quantities (bananas, dates, energy bars, chocolate milk).
+Two checks before declaring the plan done:
+
+**1. Ingredient coverage.** Walk every dish across all seven days and confirm every ingredient is either in **Already in the Fridge** or on the **Shopping List**. Add anything missing — named herbs, spices, condiments — including training-load-scaled quantities (bananas, dates, energy bars, chocolate milk).
+
+**2. Portion balance (leftover ledger).** Walk every recipe that yields more than one serving and confirm `portions cooked == portions eaten` across the week. For each multi-serving dish, list the meal slots that consume it and check the count matches the serving line. If a portion has no slot, either (a) add a meal slot that eats it within the week (respecting the ~2–3 day perishability window), or (b) reduce the batch size so nothing is left over. Do not ship a plan where any cooked portion is unaccounted for — that's the exact failure this guards against (e.g. a 2-portion Tuesday soup with only one portion scheduled).
 
 ### A6. Write the file
 
