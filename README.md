@@ -2,6 +2,18 @@
 
 A personal collection of [Claude Code](https://claude.com/claude-code) skills, scoped to this project. The skills live under [.claude/skills/](.claude/skills/) so they auto-load only when Claude Code is launched from this directory (or a subdirectory) — not globally.
 
+## Bootstrap (after a fresh clone)
+
+Open Claude Code in this directory and paste:
+
+```
+Bootstrap this repository — initialize submodules and install their dependencies.
+```
+
+That triggers the [bootstrap](.claude/skills/bootstrap/SKILL.md) skill, which runs `git submodule update --init --recursive`, creates `trainingpeaks-mcp/.venv/`, and installs `trainingpeaks-mcp` (with the `[browser]` extra) into it. After it finishes, Claude will tell you to run `tp-mcp auth` yourself (it's interactive and stores a cookie in your system keyring) and to restart Claude Code so the project-scope MCP server in [.mcp.json](.mcp.json) actually spawns.
+
+To refresh already-installed submodules later, use the [update-dependencies](.claude/skills/update-dependencies/SKILL.md) skill instead.
+
 ## Skills
 
 ### [weekly-meal-plan](.claude/skills/weekly-meal-plan/SKILL.md)

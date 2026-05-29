@@ -13,6 +13,7 @@ Each subdirectory of `.claude/skills/` is one skill, identified by a `SKILL.md` 
 - [weekly-meal-plan](.claude/skills/weekly-meal-plan/SKILL.md) — generates a Mon→Sun triathlon meal plan from TrainingPeaks data, renders to PDF, uploads to Google Drive, and answers follow-up questions during the week. Owns its own state under `plans/` (one markdown file per week, which doubles as the cache) and `favorite-recipes.md`.
 - [desmor-pool-schedule](.claude/skills/desmor-pool-schedule/SKILL.md) — looks up open-swim hours for the Desmor pool in Rio Maior, with a one-week cache in `cache/current.json` and a Gmail recheck for mid-week schedule corrections.
 - [update-dependencies](.claude/skills/update-dependencies/SKILL.md) — pulls latest commits for vendored submodules (currently `trainingpeaks-mcp`) and re-runs the install only when `pyproject.toml`/lock/entry-points changed. Skips reinstall for source-only changes since the editable install picks them up live. Reminds the user to restart Claude Code so the running MCP server process gets replaced.
+- [bootstrap](.claude/skills/bootstrap/SKILL.md) — sets up a freshly cloned working copy: `git submodule update --init`, then installs each submodule's deps (currently just `trainingpeaks-mcp` into `trainingpeaks-mcp/.venv/` with the `[browser]` extra). Hands `tp-mcp auth` off to the user since it's interactive and touches the system keyring. Defers to the submodule's own README for canonical install steps.
 
 ## External dependencies these skills assume
 
