@@ -1,0 +1,3 @@
+[submodule "trainingpeaks-mcp"]
+	path = trainingpeaks-mcp
+	url = https://github.com/JamsusMaximus/trainingpeaks-mcp.git

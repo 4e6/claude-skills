@@ -15,9 +15,9 @@ Each subdirectory of `.claude/skills/` is one skill, identified by a `SKILL.md` 
 
 ## External dependencies these skills assume
 
-The skills shell out to tools/services that must be present on the host. None of this is installed by this repo — it's the user's environment:
+The skills shell out to tools/services that must be present on the host. Most are the user's environment, except `trainingpeaks-mcp` which is now vendored as a submodule:
 
-- **TrainingPeaks MCP** (`mcp__trainingpeaks__tp_*`) — see the user's global CLAUDE.md for tool routing. Used by `weekly-meal-plan` to pull planned workouts, fitness (CTL/ATL/TSB), and the focus/next event.
+- **TrainingPeaks MCP** (`mcp__trainingpeaks__tp_*`) — vendored at [trainingpeaks-mcp/](trainingpeaks-mcp) as a git submodule from `https://github.com/JamsusMaximus/trainingpeaks-mcp.git` and registered at project scope in [.mcp.json](.mcp.json), so it loads only when Claude Code is launched from this directory. After cloning this repo, run `git submodule update --init`, then `python3 -m venv trainingpeaks-mcp/.venv && trainingpeaks-mcp/.venv/bin/pip install -e "trainingpeaks-mcp[browser]"`, then `trainingpeaks-mcp/.venv/bin/tp-mcp auth` to store the TrainingPeaks cookie in the system keyring. Used by `weekly-meal-plan` to pull planned workouts, fitness (CTL/ATL/TSB), and the focus/next event.
 - **Gmail MCP** (`mcp__claude_ai_Gmail__*`) — `desmor-pool-schedule` uses it to scan for mid-week correction emails from `secretaria.piscinas@desmor.pt`.
 - **Composio Gemini** (`COMPOSIO_MULTI_EXECUTE_TOOL` → `GEMINI_GENERATE_IMAGE`, `gemini-2.5-flash-image`) — `weekly-meal-plan` action A6.5 generates per-recipe food photos. Skipping is acceptable; the renderer falls back to emoji banners.
 - **`chromium`** + **`python3` with `markdown` module** — required by [scripts/md-to-pdf.py](.claude/skills/weekly-meal-plan/scripts/md-to-pdf.py) for headless PDF rendering. On Arch: `pacman -S chromium`, `pip install --user markdown`.

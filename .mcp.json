@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "trainingpeaks": {
+      "type": "stdio",
+      "command": "trainingpeaks-mcp/.venv/bin/tp-mcp",
+      "args": [
+        "serve"
+      ],
+      "env": {}
+    }
+  }
+}
