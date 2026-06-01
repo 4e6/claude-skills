@@ -200,6 +200,7 @@ def parse_recipe_body(lines):
     nutrition = {}
     times = {}
     image_override = {}
+    meal = ""
     state = None
 
     for raw in lines:
@@ -208,6 +209,10 @@ def parse_recipe_body(lines):
             continue
 
         if re.match(r"^\*\*Tags:\*\*", line):
+            continue
+        m_meal = re.match(r"^\*\*Meal:\*\*\s*(.+)$", line)
+        if m_meal:
+            meal = m_meal.group(1).strip()
             continue
         m_nutr = re.match(r"^\*\*Per serving:\*\*\s*(.+)$", line)
         if m_nutr:
@@ -256,6 +261,7 @@ def parse_recipe_body(lines):
         "nutrition": nutrition,
         "times": times,
         "image_override": image_override,
+        "meal": meal,
     }
 
 
@@ -700,6 +706,11 @@ ul, ol { padding: 0; margin: 0; list-style: none; }
     color: #333;
 }
 
+.recipes-toc .toc-meal {
+    color: #c1632c;
+    font-weight: 600;
+}
+
 .recipe {
     page-break-before: always;
     padding: 0.4cm 0 0;
@@ -1100,8 +1111,14 @@ def render_recipes(plan, images_dir):
         parts.append("      <ul>")
         for dish in d["dishes"]:
             aid = dish.get("anchor_id", "")
+            meal = (dish.get("structured") or {}).get("meal", "")
+            meal_html = (
+                f'<span class="toc-meal">{html_lib.escape(meal)}</span> — '
+                if meal
+                else ""
+            )
             parts.append(
-                f'        <li><a href="#{aid}">{html_lib.escape(dish["title"])}</a></li>'
+                f'        <li><a href="#{aid}">{meal_html}{html_lib.escape(dish["title"])}</a></li>'
             )
         parts.append("      </ul>")
         parts.append("    </div>")
@@ -1193,7 +1210,8 @@ def render_recipe_banner(dish_title: str, image_override: dict, images_dir) -> s
 def render_recipe(day_name, dish, anchor_index, images_dir):
     s = dish["structured"]
     title = html_lib.escape(dish["title"])
-    eyebrow = html_lib.escape(day_name)
+    meal = s.get("meal") or ""
+    eyebrow = html_lib.escape(f"{day_name} · {meal}" if meal else day_name)
     footer = render_recipe_footer(s)
     banner = render_recipe_banner(dish["title"], s.get("image_override") or {}, images_dir)
     aid = html_lib.escape(dish.get("anchor_id", ""))
