@@ -7,13 +7,30 @@ description: Plan, render, and serve weekly triathlon meal plans. Use when the u
 
 The user is a triathlete based in Portugal. Each week they ask for a meal plan that mirrors their TrainingPeaks training schedule, plus follow-up questions during the week. This skill owns the full lifecycle.
 
+## Path resolution — read this first
+
+This is a **project-scoped** skill. It lives under `<project>/.claude/skills/weekly-meal-plan/`, **not** the global `~/.claude/`. The correct absolute path is handed to you at skill launch as `Base directory for this skill: …`. **Always trust that launch banner over any path written in this file**, and **never use `~/.claude/skills/weekly-meal-plan/…`** — that directory does not exist and writing there creates a phantom tree the renderer/upload steps won't find.
+
+Every shell example below starts by binding `$SKILL_DIR` to that base directory. Do the same — set it once from the launch banner, then use `$SKILL_DIR/...` for every path:
+
+```bash
+SKILL_DIR=<the "Base directory for this skill" value from skill launch>
+# e.g. /home/dbushev/projects/4e6/claude-skills/.claude/skills/weekly-meal-plan
+```
+
+For Read/Write/Edit tool calls (which need a literal absolute path, not a shell variable), substitute that same base directory in by hand. Prose references like "the skill's `plans/`" mean `$SKILL_DIR/plans/`.
+
 ## Files this skill owns
 
+Paths are relative to `$SKILL_DIR` (see Path resolution above):
+
 ```
-~/.claude/skills/weekly-meal-plan/
+$SKILL_DIR/                                     # = <project>/.claude/skills/weekly-meal-plan/
 ├── SKILL.md                                    # this file
 ├── plans/
-│   └── meal-plan-week-{month}-{day}-{year}.md  # one per week, source of truth and cache
+│   ├── meal-plan-week-{month}-{day}-{year}.md  # one per week, source of truth and cache
+│   ├── meal-plan-week-{month}-{day}-{year}.pdf # current week's rendered PDF (old ones pruned in A7.5)
+│   └── images/week-{month}-{day}-{year}/        # per-recipe photos for the current week
 ├── favorite-recipes.md                         # recipes the user explicitly asked to save
 └── scripts/
     └── md-to-pdf.py                            # Markdown → PDF (headless Chromium)
@@ -196,7 +213,7 @@ Two checks before declaring the plan done:
 
 ### A6. Write the file
 
-Save to `~/.claude/skills/weekly-meal-plan/plans/meal-plan-week-{month}-{day}-{year}.md` (lowercase month name, no leading zero on day).
+Save to `$SKILL_DIR/plans/meal-plan-week-{month}-{day}-{year}.md` (lowercase month name, no leading zero on day). For the Write tool, expand `$SKILL_DIR` to the launch base directory.
 
 ### A6.5. Generate recipe preview images
 
@@ -226,10 +243,12 @@ Call the Composio **GEMINI_GENERATE_IMAGE** tool (`gemini-2.5-flash-image`, aspe
 
 ```bash
 # After downloading {dish-slug}.png from the presigned s3url:
-mkdir -p ~/.claude/skills/weekly-meal-plan/plans/images/week-{month}-{day}-{year}
+SKILL_DIR=<base directory from skill launch>
+WEEK_DIR="$SKILL_DIR/plans/images/week-{month}-{day}-{year}"
+mkdir -p "$WEEK_DIR"
 magick {dish-slug}.png -resize '800x533!' -quality 85 -interlace JPEG \
     -sampling-factor 4:2:0 -strip \
-    ~/.claude/skills/weekly-meal-plan/plans/images/week-{month}-{day}-{year}/{dish-slug}.jpg
+    "$WEEK_DIR/{dish-slug}.jpg"
 ```
 
 #### Option 2: Hugging Face FLUX.1-schnell via dynamic_space (fallback)
@@ -255,7 +274,8 @@ Parameter rules:
 The tool result contains an inline preview and an `Image URL:` line pointing at a Gradio temp file (typically `https://evalstate-flux1-schnell.hf.space/.../image.webp` or similar). Download immediately and resize to 800×533 — same magick invocation as the Gemini branch, just starting from a `.webp`:
 
 ```bash
-WEEK_DIR=~/.claude/skills/weekly-meal-plan/plans/images/week-{month}-{day}-{year}
+SKILL_DIR=<base directory from skill launch>
+WEEK_DIR="$SKILL_DIR/plans/images/week-{month}-{day}-{year}"
 mkdir -p "$WEEK_DIR"
 
 curl -sS --fail --max-time 90 -o /tmp/{dish-slug}.webp "<image-url-from-tool-output>"
@@ -278,7 +298,8 @@ magick /tmp/{dish-slug}.webp -resize '800x533!' -quality 85 -interlace JPEG \
 Zero-auth HTTP endpoint backed by FLUX. Returns a 800×533 JPEG directly — **no resize / no ImageMagick step needed**, just save the response body.
 
 ```bash
-WEEK_DIR=~/.claude/skills/weekly-meal-plan/plans/images/week-{month}-{day}-{year}
+SKILL_DIR=<base directory from skill launch>
+WEEK_DIR="$SKILL_DIR/plans/images/week-{month}-{day}-{year}"
 mkdir -p "$WEEK_DIR"
 
 # URL-encode the prompt (python3 one-liner — bash doesn't have a builtin):
@@ -301,12 +322,13 @@ curl -sS --fail --max-time 120 \
 ### A7. Render the PDF
 
 ```bash
-python3 ~/.claude/skills/weekly-meal-plan/scripts/md-to-pdf.py \
-    ~/.claude/skills/weekly-meal-plan/plans/meal-plan-week-{month}-{day}-{year}.md \
-    /tmp/meal-plan-week-{month}-{day}-{year}.pdf
+SKILL_DIR=<base directory from skill launch>
+python3 "$SKILL_DIR/scripts/md-to-pdf.py" \
+    "$SKILL_DIR/plans/meal-plan-week-{month}-{day}-{year}.md" \
+    "$SKILL_DIR/plans/meal-plan-week-{month}-{day}-{year}.pdf"
 ```
 
-The script prints the absolute output path on success. Required tools: `chromium` and the `markdown` Python module — both already present. If the script fails, surface the stderr to the user; do not silently fall back.
+Render the PDF **into `plans/`** (next to its `.md`), not `/tmp` — A7.5 (cleanup) and A8 (upload) both read it from `plans/`. The script prints the absolute output path on success. Required tools: `chromium` and the `markdown` Python module — both already present. If the script fails, surface the stderr to the user; do not silently fall back.
 
 The renderer is **not** a plain markdown-to-HTML dump — it parses the schema in A4 directly and lays it out as a styled PDF (blue/orange palette, Playfair Display titles, cover page, day cards, multi-column shopping list, one-recipe-per-page with numbered steps). The look is modeled on the "2023-01 Meal Template.pdf" the user has on Drive. **Don't change the section headings or bullet shapes in A4** — the parser depends on them; changing them will silently drop content from the PDF. Google Fonts is fetched at render time for best typography; if offline, the layout still works using local serif/sans fallbacks.
 
@@ -316,7 +338,8 @@ Once the new PDF exists locally, remove old PDFs and image directories from `pla
 
 ```bash
 WEEK_STEM="meal-plan-week-{month}-{day}-{year}"
-PLANS_DIR=~/.claude/skills/weekly-meal-plan/plans
+SKILL_DIR=<base directory from skill launch>
+PLANS_DIR="$SKILL_DIR/plans"
 
 find "$PLANS_DIR" -maxdepth 1 -type f -name 'meal-plan-week-*.pdf' \
     ! -name "${WEEK_STEM}.pdf" -delete
@@ -335,8 +358,9 @@ Notes:
 Use the **rclone** CLI — the `gdrive:` remote is already configured against the user's Google Drive (bushevdv@gmail.com). This bypasses the Drive MCP's inline-base64 path, which doesn't fit a typical 0.9–1.2 MB PDF in a single tool call.
 
 ```bash
+SKILL_DIR=<base directory from skill launch>
 rclone copy -v --stats=0 \
-    ~/.claude/skills/weekly-meal-plan/plans/meal-plan-week-{month}-{day}-{year}.pdf \
+    "$SKILL_DIR/plans/meal-plan-week-{month}-{day}-{year}.pdf" \
     "gdrive:Meal Plans/"
 ```
 
@@ -360,7 +384,7 @@ Two-line summary max: the training overview line ("~10:50 / 536 TSS, hard days W
 ## B. Today's menu
 
 1. Resolve today: `TZ=Europe/Lisbon date +%A` (e.g. `Friday`) and `TZ=Europe/Lisbon date +%Y-%m-%d`.
-2. Find the current week's plan: list `~/.claude/skills/weekly-meal-plan/plans/`, parse the Monday-date out of each filename, pick the most recent file whose Monday ≤ today ≤ Monday+6.
+2. Find the current week's plan: list the skill's `plans/` directory (`$SKILL_DIR/plans/`, resolved per Path resolution), parse the Monday-date out of each filename, pick the most recent file whose Monday ≤ today ≤ Monday+6.
    - If no current-week file exists, tell the user the plan hasn't been created yet and offer to run action A.
 3. Read the file, jump to `### {Today} — ...`, return that day's bullets.
 4. If the user asks about a specific meal ("what's for dinner today"), return only that line plus the training context one-liner (e.g. *"Today is Wed — Plyometrics + Zwift VO2max 1h15"*).
@@ -391,7 +415,7 @@ Trigger phrases: "save this", "I liked the X, save it", "add to favorites", "rem
 
 1. Identify which dish the user means. Usually it's the one just discussed in this conversation — quote the dish name back briefly to confirm if there's any ambiguity (more than one dish in recent turns).
 2. Locate the recipe — current week's plan first, then `favorite-recipes.md` (already saved → tell the user and stop), then generate fresh if needed.
-3. Append to `~/.claude/skills/weekly-meal-plan/favorite-recipes.md` using the format shown at the top of that file. Today's date for `*Saved {YYYY-MM-DD}*`. Reference the week of origin if known.
+3. Append to `$SKILL_DIR/favorite-recipes.md` (resolved per Path resolution) using the format shown at the top of that file. Today's date for `*Saved {YYYY-MM-DD}*`. Reference the week of origin if known.
 4. One-line confirmation: *"Saved 'Bolognese with pasta' to favorites."*
 
 ---
