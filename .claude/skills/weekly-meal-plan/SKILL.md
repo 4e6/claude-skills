@@ -123,7 +123,7 @@ Follow the existing schema **exactly** — preserve section order and headings s
 ## Shopping List
 
 ### Proteins
-- [ ] Item (Portuguese name) — qty
+- [ ] Item (Portuguese name) — qty (Day[, Day…])
 
 ### Carbs
 ### Fruit
@@ -212,7 +212,14 @@ This controls the category-themed preview banner at the top of the recipe page (
   - In the **Meal Plan** bullets: the cooking day says how many portions are made and eaten now, and each later day that finishes the leftovers references it. E.g. Tuesday dinner `Lentil soup (cook 2 — eat 1, reserve 1)` and Thursday lunch `Lentil soup (leftover from Tue)`.
   - In the recipe's serving line: spell out the allocation, e.g. `**Ingredients (2 servings — 1 Tue dinner, 1 Thu lunch)**`.
   - Pick batch sizes that divide cleanly into slots you actually have. If a dish only fits one meal this week, cook **one** serving — don't default to 2. Perishable leftovers (cooked fish, leafy salads, dressed dishes) should be consumed within ~2–3 days of cooking; don't park a Monday leftover on Sunday.
-- **Bilingual shopping list.** Each item: English name + Portuguese name in parentheses, e.g. `Chicken breasts (peito de frango) — 1 kg`. Quantities should scale with the week's training load (more bananas/dates/energy bars/chocolate milk on big aerobic weeks).
+- **Bilingual shopping list.** Each item: English name + Portuguese name in parentheses, then the quantity, e.g. `Chicken breasts (peito de frango) — 1 kg`. Quantities should scale with the week's training load (more bananas/dates/energy bars/chocolate milk on big aerobic weeks).
+- **Usage-day tag on every shopping item.** End each item with a parenthesised tag naming the day(s) it's used, so the list doubles as a "what do I need this for / when" reference at the shop. The tag is the *last* thing on the line, after the quantity:
+  - Single day: `Salmon fillets (filetes de salmão) — 200 g (Wed)`.
+  - Multiple days: list them comma-separated in week order: `Chicken breasts (peito de frango) — 800 g (Tue, Fri)`.
+  - Add a short context word when it disambiguates which dish: `Chicken thighs, bone-in (coxas de frango) — 700 g (Sat roast)`, `Ground beef (carne picada) — 500 g (Thu bolognese)`.
+  - Staples/pantry refills with no single owning day take a note instead of a day: `Olive oil (azeite) — bottle (top up if low)`; truly generic items (salt, stock cubes, dried herbs) may carry just a refill note or no tag.
+  - Training-fuel items get the sessions they cover: `Chocolate milk (leite com chocolate) — 4 bottles (Wed, Thu, Sat, Sun post-session)`.
+  - Derive these from the same dish-by-day walk you do in the A5 ingredient-coverage check — record, per item, which days consume it, then write that set as the tag.
 - **Reference supermarkets.** Pingo Doce, Continente, Lidl. The closing note typically flags which is cheapest for specific categories.
 - **Athlete is a triathlete** (swim/bike/run + core/plyometrics). Don't suggest meals that conflict with that (e.g. very heavy/fatty pre-session meals).
 
@@ -231,7 +238,7 @@ The Recipes section is a **day-by-day overview**: the reader flips to a day and 
 
 Three checks before declaring the plan done:
 
-**1. Ingredient coverage.** Walk every dish across all seven days and confirm every ingredient is either in **Already in the Fridge** or on the **Shopping List**. Add anything missing — named herbs, spices, condiments — including training-load-scaled quantities (bananas, dates, energy bars, chocolate milk).
+**1. Ingredient coverage + usage-day tags.** Walk every dish across all seven days and confirm every ingredient is either in **Already in the Fridge** or on the **Shopping List**. Add anything missing — named herbs, spices, condiments — including training-load-scaled quantities (bananas, dates, energy bars, chocolate milk). As you walk, record for each shopping item the set of days that consume it, and confirm every purchased item ends with its usage-day tag (per the bilingual-shopping-list rule). The tag's day set must match where the item is actually used — if you add or move a meal, update the tag.
 
 **1b. Recipe-section day×meal completeness.** For each day, confirm the Recipes section has a `#### {Dish}` entry for every main meal that day's Meal Plan lists (Breakfast/Lunch/Dinner), each with a `**Meal:**` line. The dish must match the Meal Plan bullet. Every repeat/leftover meal must still appear as its own entry with a working pointer line (`See/Same as {Day} — {Dish}`) whose `{Dish}` matches an origin entry's title on that day. No main meal may be missing from the Recipes section.
 
