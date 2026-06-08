@@ -1285,7 +1285,7 @@ def main():
     parser.add_argument("output", help="Path to output PDF file")
     args = parser.parse_args()
 
-    md_path = Path(args.input)
+    md_path = Path(args.input).resolve()
     md_text = md_path.read_text(encoding="utf-8")
     plan = parse_plan(md_text)
 
