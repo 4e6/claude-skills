@@ -6,3 +6,7 @@
 __pycache__/
 *.pyc
 *.pyo
+
+# Local virtualenvs (e.g. weekly-meal-plan/scripts/.venv). Recreated from the
+# adjacent requirements.txt; never committed.
+.venv/

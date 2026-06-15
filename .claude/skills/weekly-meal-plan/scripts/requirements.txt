@@ -1,0 +1,9 @@
+# Python dependencies for md-to-pdf.py (the weekly-meal-plan PDF renderer).
+# Install into a local venv so the skill never depends on a system/user Python:
+#   python3 -m venv .venv
+#   .venv/bin/pip install -r requirements.txt
+# Then invoke the script with .venv/bin/python (see SKILL.md action A7).
+#
+# NOTE: chromium and ImageMagick (`magick`) are system binaries the script
+# shells out to — they are NOT Python packages and cannot live in this venv.
+markdown==3.10.2

@@ -33,7 +33,9 @@ $SKILL_DIR/                                     # = <project>/.claude/skills/wee
 │   └── images/week-{month}-{day}-{year}/        # per-recipe photos for the current week
 ├── favorite-recipes.md                         # recipes the user explicitly asked to save
 └── scripts/
-    └── md-to-pdf.py                            # Markdown → PDF (headless Chromium)
+    ├── md-to-pdf.py                            # Markdown → PDF (headless Chromium)
+    ├── requirements.txt                        # Python deps for the renderer (just `markdown`)
+    └── .venv/                                  # local virtualenv (gitignored; created on first render)
 ```
 
 - The filename date is **the Monday of that week**, lowercase month: `meal-plan-week-may-18-2026.md`.
@@ -356,12 +358,21 @@ curl -sS --fail --max-time 120 \
 
 ```bash
 SKILL_DIR=<base directory from skill launch>
-python3 "$SKILL_DIR/scripts/md-to-pdf.py" \
+
+# One-time, idempotent: create the renderer's own venv if it's missing. The
+# script's only third-party Python dependency is `markdown`, pinned in
+# scripts/requirements.txt — never rely on a system/user-site `markdown`.
+if [ ! -x "$SKILL_DIR/scripts/.venv/bin/python" ]; then
+    python3 -m venv "$SKILL_DIR/scripts/.venv"
+    "$SKILL_DIR/scripts/.venv/bin/pip" install -r "$SKILL_DIR/scripts/requirements.txt"
+fi
+
+"$SKILL_DIR/scripts/.venv/bin/python" "$SKILL_DIR/scripts/md-to-pdf.py" \
     "$SKILL_DIR/plans/meal-plan-week-{month}-{day}-{year}.md" \
     "$SKILL_DIR/plans/meal-plan-week-{month}-{day}-{year}.pdf"
 ```
 
-Render the PDF **into `plans/`** (next to its `.md`), not `/tmp` — A7.5 (cleanup) and A8 (upload) both read it from `plans/`. The script prints the absolute output path on success. Required tools: `chromium` and the `markdown` Python module — both already present. If the script fails, surface the stderr to the user; do not silently fall back.
+Render the PDF **into `plans/`** (next to its `.md`), not `/tmp` — A7.5 (cleanup) and A8 (upload) both read it from `plans/`. The script prints the absolute output path on success. **Always invoke it through `scripts/.venv/bin/python`** (the snippet above creates that venv from `scripts/requirements.txt` on first run) — do not call bare `python3`, which has no `markdown`. The one remaining external dependency is the system `chromium` binary. If the script fails, surface the stderr to the user; do not silently fall back.
 
 The renderer is **not** a plain markdown-to-HTML dump — it parses the schema in A4 directly and lays it out as a styled PDF (blue/orange palette, Playfair Display titles, cover page, day cards, multi-column shopping list, one-recipe-per-page with numbered steps). The look is modeled on the "2023-01 Meal Template.pdf" the user has on Drive. **Don't change the section headings or bullet shapes in A4** — the parser depends on them; changing them will silently drop content from the PDF. Google Fonts is fetched at render time for best typography; if offline, the layout still works using local serif/sans fallbacks.
 
@@ -465,5 +476,5 @@ Return the `## Already in the Fridge` section of the current week's plan verbati
 - **Don't ask before reading TP.** Reads (`tp_get_workouts`, `tp_get_fitness`, etc.) are safe and cached for the conversation — call them freely. Only confirm before mutating TP (this skill never mutates TP, but still).
 - **Don't refetch profile basics** (FTP, zones, A-race) within one conversation unless the user just changed them.
 - **Don't generate the PDF speculatively** — only as part of action A (creating a week). Querying actions read the cached `.md` and never touch chromium.
-- **If chromium / markdown ever go missing**, ask the user to reinstall (`pacman -S chromium` and `pip install --user markdown` on Arch). Do not fall back to a different renderer silently; the layout is tuned for this pipeline.
+- **If the renderer's venv is missing/broken**, recreate it from the pinned requirements: `python3 -m venv "$SKILL_DIR/scripts/.venv" && "$SKILL_DIR/scripts/.venv/bin/pip" install -r "$SKILL_DIR/scripts/requirements.txt"` (the A7 snippet does this automatically on first run). **If `chromium` is missing**, ask the user to reinstall it (`pacman -S chromium` on Arch) — it's a system binary, not a Python package, so it can't go in the venv. Do not fall back to a different renderer silently; the layout is tuned for this pipeline.
 - **The repo at `~/projects/4e6/meal-plans/` was the origin of this skill** and is being deleted. The current week (May 11–17, 2026) was migrated to `plans/` so action B works immediately. After the repo is gone, the skill is fully self-contained.
