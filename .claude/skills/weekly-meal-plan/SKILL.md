@@ -399,7 +399,7 @@ Notes:
 
 ### A8. Upload to Google Drive (via rclone)
 
-Use the **rclone** CLI — the `gdrive:` remote is already configured against the user's Google Drive (bushevdv@gmail.com). This bypasses the Drive MCP's inline-base64 path, which doesn't fit a typical 0.9–1.2 MB PDF in a single tool call.
+Use the **rclone** CLI — the `gdrive:` remote is already configured against the user's Google Drive. This bypasses the Drive MCP's inline-base64 path, which doesn't fit a typical 0.9–1.2 MB PDF in a single tool call.
 
 ```bash
 SKILL_DIR=<base directory from skill launch>
