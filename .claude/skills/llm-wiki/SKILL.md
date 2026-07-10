@@ -289,7 +289,8 @@ coverage gap deserves a page — stays with the model.
 - Only the **root** `index.md` may carry frontmatter (§6). `E004` catches this.
 - `sources` globs are **gitignore syntax** matched against `git ls-files`, so
   untracked files are invisible to coverage. A bare directory is expanded to
-  `dir/**`.
+  `dir/**`; any other slash-less pattern (`Makefile`, `*.sql`) is expanded to
+  `**/pattern` so coverage and git-diff pathspecs agree.
 - **The project's `.gitignore` needs no special handling** — coverage only ever
   sees tracked files, so ignored files are already excluded. Never merge
   `.gitignore` into `.okfignore`: a file that was committed and *later* ignored

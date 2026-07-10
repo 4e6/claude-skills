@@ -11,6 +11,8 @@ Everything the model cannot reliably eyeball lives here; everything requiring
 judgement (what a concept should say) stays in SKILL.md.
 
 Exit codes: 0 = clean, 1 = errors (or warnings under --strict), 2 = bad usage.
+S004 coverage gaps are advisory — whether a gap deserves a page is a judgement
+call — so `stale` reports them but they never affect the exit code.
 """
 
 from __future__ import annotations
@@ -29,6 +31,10 @@ import yaml
 
 # OKF v0.1 §3.1 — reserved at any level of the hierarchy.
 RESERVED = {"index.md", "log.md"}
+
+# An index.md containing this marker is hand-curated: `index --write` leaves it
+# alone, and lint treats its links as deliberate (they count against W011).
+MANUAL_MARKER = "<!-- okf:manual -->"
 
 # Frontmatter keys OKF defines. Anything else is a producer extension (§4.1).
 OKF_KEYS = {"type", "title", "description", "resource", "tags", "timestamp"}
@@ -127,6 +133,19 @@ def derive_title(path: Path) -> str:
     return path.stem.replace("-", " ").replace("_", " ").strip().title()
 
 
+def has_concepts(directory: Path) -> bool:
+    """True if any concept (non-reserved, non-hidden .md) lives under `directory`.
+
+    A directory holding only an index.md or log.md carries no knowledge of its
+    own, so indexes neither list it nor expect it to have an index.
+    """
+    return any(
+        p.name not in RESERVED
+        and not any(part.startswith(".") for part in p.relative_to(directory).parts)
+        for p in directory.rglob("*.md")
+    )
+
+
 def resolve_link(target: str, doc: Path, bundle: Path) -> Path | None:
     """Resolve an in-bundle markdown link to a filesystem path, or None if external."""
     if SCHEME_RE.match(target) or target.startswith("#"):
@@ -155,8 +174,17 @@ def normalize_sources(patterns: list[str], repo: Path, gitlinks: frozenset[str] 
         pattern = str(raw).strip().strip("/")
         if not pattern:
             continue
-        if pattern not in gitlinks and not GLOB_CHARS.search(pattern) and (repo / pattern).is_dir():
+        if pattern in gitlinks:
+            out.append(pattern)
+            continue
+        if not GLOB_CHARS.search(pattern) and (repo / pattern).is_dir():
             pattern = f"{pattern}/**"
+        elif "/" not in pattern:
+            # gitignore syntax matches a slash-less pattern (`Makefile`,
+            # `*.sql`) at any depth, but git's `:(glob)` pathspec anchors it to
+            # the root — coverage and diffing would disagree. A leading `**/`
+            # means "in all directories, including the root" in both dialects.
+            pattern = f"**/{pattern}"
         out.append(pattern)
     return out
 
@@ -308,22 +336,28 @@ def lint(bundle: Bundle) -> tuple[list[dict], list[dict]]:
             err("E007", doc.rel, "log entries must be newest-first")
 
     # §5.3 — broken links are tolerated by consumers, but usually a typo here.
+    # Inbound links (for W011) are counted only from concepts, logs and
+    # hand-curated (`okf:manual`) indexes: `index --write` links every concept
+    # from its directory's index, so auto-generated indexes would satisfy the
+    # orphan check by construction and it could never fire.
     known = {d.path.resolve() for d in bundle.all_docs}
     inbound: set[Path] = set()
     for doc in bundle.all_docs:
+        curated = doc.path.name != "index.md" or MANUAL_MARKER in doc.body
         for target, resolved in doc_links(doc, bundle):
             if resolved is None:
                 continue
             rp = resolved.resolve()
             if rp in known:
-                inbound.add(rp)
+                if curated and rp != doc.path.resolve():
+                    inbound.add(rp)
             elif resolved.suffix == ".md" and not resolved.exists():
                 warn("W010", doc.rel, f"link target does not exist: {target}")
 
     # Orphans: unreachable concepts are invisible to progressive disclosure.
     for doc in bundle.concepts:
         if doc.path.resolve() not in inbound:
-            warn("W011", doc.rel, "orphan — no other document links to it")
+            warn("W011", doc.rel, "orphan — no concept, log or curated index links to it")
 
     # Index coverage: every concept/subdir listed in its directory's index.md.
     for index_doc in bundle.indexes:
@@ -333,7 +367,7 @@ def lint(bundle: Bundle) -> tuple[list[dict], list[dict]]:
             if child.is_dir():
                 if child.name.startswith("."):
                     continue
-                if not any(child.rglob("*.md")):
+                if not has_concepts(child):
                     continue
                 expected = (child / "index.md").resolve()
                 if expected not in linked:
@@ -514,7 +548,8 @@ def stale(bundle: Bundle) -> dict:
     return {
         "findings": findings,
         "coverage_gaps": [
-            {"path": k, "count": len(v), "sample": sorted(v)[:8]} for k, v in sorted(gaps.items())
+            {"code": "S004", "path": k, "count": len(v), "sample": sorted(v)[:8]}
+            for k, v in sorted(gaps.items())
         ],
     }
 
@@ -523,7 +558,6 @@ def stale(bundle: Bundle) -> dict:
 # index
 # ---------------------------------------------------------------------------
 
-MANUAL_MARKER = "<!-- okf:manual -->"
 INDEX_ENTRY_RE = re.compile(r"^\*\s+\[[^\]]*\]\(\s*([^)\s]+)\s*\)\s*(?:-\s*(.*))?$")
 
 
@@ -544,7 +578,7 @@ def directory_contents(directory: Path, bundle: Bundle) -> tuple[list[Doc], list
     subdirs = [
         c
         for c in sorted(directory.iterdir())
-        if c.is_dir() and not c.name.startswith(".") and any(c.rglob("*.md"))
+        if c.is_dir() and not c.name.startswith(".") and has_concepts(c)
     ]
     return concepts, subdirs
 
@@ -589,11 +623,15 @@ def render_index(directory: Path, bundle: Bundle) -> str:
 
 
 def index_dirs(bundle: Bundle) -> list[Path]:
+    """Every directory that needs an index: concept/index dirs and all their
+    ancestors up to the root, so an intermediate directory with only
+    subdirectories still gets the index.md its parent's index links to."""
     dirs = {bundle.root}
-    for doc in bundle.concepts:
-        dirs.add(doc.path.parent)
-    for doc in bundle.indexes:
-        dirs.add(doc.path.parent)
+    for doc in [*bundle.concepts, *bundle.indexes]:
+        directory = doc.path.parent
+        while directory != bundle.root:
+            dirs.add(directory)
+            directory = directory.parent
     return sorted(dirs)
 
 
