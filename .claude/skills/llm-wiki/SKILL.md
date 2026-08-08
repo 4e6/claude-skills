@@ -46,6 +46,13 @@ Rank every candidate fact by half-life. Write the top half; refuse the bottom:
 When unsure, apply the test: *would this page still be correct after a big
 refactor that preserved behaviour?* If no, it belongs in the code.
 
+The rule governs **admission**. Retirement runs on a different axis: does the
+page record an *event* or a *state of the world*? A `Decision` is an event — "in
+2024 we chose X, having rejected Y" stays true forever, including long after you
+stop doing X, which is why decisions supersede and never delete. Every other
+type asserts how the world currently *is*; when the world moves, those pages do
+not go out of date, they become **false**. Retire them — see A6.
+
 ## The three layers (L0 / L1 / L2)
 
 Progressive disclosure (§6) works because knowledge is stored at three
@@ -230,9 +237,9 @@ Then, per finding:
 - **`S003` `sources` but no `source_commit`** — backfill from the last commit
   that touched them: `git log -1 --format=%H -- <sources>`.
 
-- **`S005` `sources` matches nothing** — the code it described is gone. For a
-  `Module`, delete the page and log a `**Deprecation**` entry. For a `Decision`,
-  never delete: set `status: superseded`. Fix any inbound links.
+- **`S005` `sources` matches nothing** — the code it described is gone. This is
+  the only retirement the script can detect; resolve it exactly as A6 does —
+  rewrite, retire, or supersede.
 
 - **`S006` `source_commit` unreachable or not an ancestor of HEAD** — history was
   rewritten (rebase, squash, amend), so the diff is meaningless. Re-review the
@@ -293,8 +300,23 @@ Answer from the wiki before reading code, walking the layers in order: load
 cite them by path. Drop to L2 only when a page points you at code.
 
 If the answer isn't there but was worth asking, that is an ingest signal: offer
-to write it down (A2). If the wiki contradicts the code, **the code wins** —
-then fix the page and log it.
+to write it down (A2).
+
+If a page contradicts the code — or the world, which git cannot see: a vendor
+bug fixed, a service dropped, infrastructure migrated off — **reality wins**. A
+page without `sources` is invisible to `stale` by construction, so an encounter
+is the only signal there will ever be. Act on it rather than reading past it:
+
+- **Rewrite** when it is partly true — usually because the code still carries the
+  scar. A workaround for a bug since fixed is a live page, not a dead one: say
+  the workaround can now be removed.
+- **Retire** when it is simply false: delete it, fix inbound links, log a
+  `**Deprecation**` entry. Deletion is cheap — `git log` still has the page and
+  `log.md` is the tombstone. A false page costs more than a missing one.
+- **Supersede** for a `Decision`, never delete (A2).
+
+Never retire on age alone. A three-year-old `Gotcha` that is still true is the
+wiki working exactly as intended; only evidence retires a page.
 
 ## Gotchas
 
