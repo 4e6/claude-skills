@@ -6,25 +6,20 @@ description: Create and maintain an LLM-wiki — a durable, agent-readable knowl
 # LLM-wiki (Open Knowledge Format)
 
 An **LLM-wiki** is a knowledge base an agent both writes and reads: durable facts
-about a project distilled into small, cross-linked markdown pages. It differs
-from RAG in *when* the synthesis happens — RAG re-derives an answer from raw
-chunks on every query; a wiki pays that cost once, at ingest, and the result
-compounds. It differs from a README in that it is structured for retrieval.
+about a project distilled into small, cross-linked markdown pages. Unlike RAG,
+the synthesis happens once, at ingest, and compounds.
 
 **Open Knowledge Format (OKF)** is that pattern, specified. Google Cloud's OKF
-v0.1 spec explicitly names "LLM 'wiki' repositories" as the practice it
-standardizes, so this skill treats them as one thing: the wiki *is* an OKF
-bundle. Following the spec means the wiki is readable by any agent or human, is
-diffable in git, needs no SDK, and can be handed to a different tool later.
+v0.1 names "LLM 'wiki' repositories" as the practice it standardizes, so the
+wiki *is* an OKF bundle: readable by any agent or human, diffable in git, no SDK.
 
 Read [reference/okf-v0.1.md](reference/okf-v0.1.md) before writing any page. Read
 [reference/concept-types.md](reference/concept-types.md) before choosing a `type`.
 
 > **Scope note.** This skill is version-controlled in the `claude-skills` repo but
 > symlinked into `~/.claude/skills/llm-wiki`, so it loads globally and operates on
-> whatever project you are in. It is the one skill in that repo that targets *other*
-> repos. Because of that, always invoke the script by absolute path (see
-> [Scripts](#scripts)) — the working directory is the target project, not here.
+> whatever project you are in. Always invoke the script by absolute path (see
+> [Scripts](#scripts)) — `$PWD` is the target project, not here.
 
 ## The half-life rule
 
@@ -51,8 +46,23 @@ Rank every candidate fact by half-life. Write the top half; refuse the bottom:
 When unsure, apply the test: *would this page still be correct after a big
 refactor that preserved behaviour?* If no, it belongs in the code.
 
-This rule is also the sync strategy. Low-half-life content is what forces
-constant re-syncing; by simply not writing it, most staleness never arises.
+## The three layers (L0 / L1 / L2)
+
+Progressive disclosure (§6) works because knowledge is stored at three
+resolutions. Always know which one you are writing or reading:
+
+| Layer | Lives in | Size | Read when |
+|---|---|---|---|
+| **L0** — abstract | `description:` frontmatter, surfaced in `index.md` | one sentence | scanning for relevance |
+| **L1** — the page | the concept body | a screen | the page looks relevant |
+| **L2** — ground truth | the code itself, reached via `sources:` | unbounded | you need specifics |
+
+**The wiki is L0 and L1 only; it never becomes L2.** The code is already a
+perfect copy of itself, so a page that reproduces it creates a second source of
+truth that begins rotting immediately. This is the half-life rule restated
+structurally, and it is also the sync strategy: L1 carries *why* and *what must
+hold*, which survives the refactors that invalidate L2, so most staleness never
+arises.
 
 ## Layout
 
@@ -62,7 +72,7 @@ what lets a single commit change behaviour and the knowledge about it together.
 ```
 <project>/
 ├── CLAUDE.md            # points at the wiki (see A5) — this is the read path
-└── wiki/                # the OKF bundle root
+└── wiki/                # the OKF bundle root (some projects use .wiki/)
     ├── index.md         # okf_version: "0.1"; the only index with frontmatter
     ├── log.md           # newest-first, ISO-dated change history
     ├── overview.md      # type: Overview
@@ -71,6 +81,7 @@ what lets a single commit change behaviour and the knowledge about it together.
     ├── decisions/       # type: Decision  (NNNN-slug.md, never renumbered)
     ├── domain/          # type: Glossary Term | Data Model
     ├── invariants/      # type: Invariant
+    ├── conventions/     # type: Convention
     ├── playbooks/       # type: Playbook
     ├── integrations/    # type: Integration
     ├── gotchas/         # type: Gotcha
@@ -90,12 +101,12 @@ producer extension. Use these, and nothing else, so the scripts can reason:
 ---
 type: Module                    # REQUIRED. From reference/concept-types.md.
 title: Auth                     # recommended
-description: One sentence.      # recommended — index entries reuse it verbatim
+description: One sentence.      # recommended — this is L0; indexes reuse it verbatim
 tags: [auth]                    # recommended
 timestamp: 2026-07-10T09:00:00Z # recommended — last *meaningful* change
 resource: https://…             # only if a canonical external asset exists
 # --- producer extensions this skill defines ---
-sources: [src/auth/**]          # repo-relative gitignore-syntax globs this page describes
+sources: [src/auth/**]          # repo-relative gitignore-syntax globs — the page's L2
 source_commit: 4f2a1c9e…        # commit at which `sources` was last actually read
 status: accepted                # Decision / Open Question only
 superseded_by: /decisions/0009-mtls.md
@@ -111,6 +122,35 @@ Link with plain markdown, bundle-absolute: `[auth](/architecture/auth.md)`.
 Not `[[wikilinks]]` — OKF §5. Broken links are legal (§5.3), so linking a page
 you intend to write next is fine.
 
+## Scripts
+
+`$PWD` is the target project, so resolve both the script and the bundle
+explicitly. Set once per session:
+
+```bash
+OKF=~/.claude/skills/llm-wiki/scripts   # symlink resolves fine
+WIKI=wiki                               # check first — some projects use .wiki
+```
+
+`okf.py` needs a venv, created on first use from `requirements.txt` (same
+convention as `weekly-meal-plan`; `.venv/` is gitignored). Create it only if
+`"$OKF/.venv/bin/python"` is missing:
+
+```bash
+python3 -m venv "$OKF/.venv" && "$OKF/.venv/bin/pip" install -r "$OKF/requirements.txt"
+```
+
+Always invoke as `"$OKF/.venv/bin/python" "$OKF/okf.py"` — never a system Python.
+It shells out to `git`, so run it from inside the target repo: `--bundle` resolves
+against `$PWD` (defaulting to `wiki`, which is wrong for a `.wiki/` bundle — pass
+it explicitly) and `--repo` defaults to the bundle's git root. All three
+subcommands accept `--json`.
+
+The split is deliberate: the script does what is mechanically checkable
+(conformance, link graph, orphans, git diffs, index rendering). Every judgement
+— what a page should say, whether a diff is cosmetic or semantic, whether a
+coverage gap deserves a page — stays with the model.
+
 ## Operations
 
 ### A1 — Bootstrap a new wiki
@@ -119,7 +159,7 @@ you intend to write next is fine.
    it isn't obvious; a wiki seeded from a misread is worse than none.
 2. Explore the repo to find real subsystems. Do not mirror the directory tree —
    group by responsibility.
-3. Write `wiki/index.md` (with `okf_version: "0.1"`), `wiki/overview.md`, and a
+3. Write `$WIKI/index.md` (with `okf_version: "0.1"`), `$WIKI/overview.md`, and a
    *small* set of pages you can actually support: typically `overview.md`, one
    `Module` per genuine subsystem, and any `Decision` / `Gotcha` the user
    volunteers. **Ten good pages beat sixty generated ones.**
@@ -140,8 +180,9 @@ fact during other work.
    If nothing fits, it probably fails the half-life rule.
 2. Check for an existing page first — **update in place rather than adding a
    near-duplicate**. Two pages that disagree are the main failure mode of a wiki.
-3. Write the page. Prefer headings/lists/tables over prose (OKF §4.2). Cite
-   external claims under `# Citations` (§8).
+3. Write the page: a one-sentence `description` (L0) and a body that stops at L1.
+   Prefer headings/lists/tables over prose (§4.2). Cite external claims under
+   `# Citations` (§8).
 4. Cross-link both ways: the new page links its neighbours, and at least one
    existing page links to it. An unlinked page is invisible (`W011`).
 5. Set `timestamp` (`date -u +%Y-%m-%dT%H:%M:%SZ`) and, if it has `sources`,
@@ -159,7 +200,7 @@ stale?"), and proactively after landing a change that touched architecture, a
 decision, an invariant, a data model, or an integration.
 
 ```bash
-"$OKF/.venv/bin/python" "$OKF/okf.py" --bundle wiki stale --json
+"$OKF/.venv/bin/python" "$OKF/okf.py" --bundle "$WIKI" stale --json
 ```
 
 Then, per finding:
@@ -210,23 +251,23 @@ their voice, and a wrong page is worse than a missing one.
 Always run both, in this order, after any wiki edit:
 
 ```bash
-"$OKF/.venv/bin/python" "$OKF/okf.py" --bundle wiki index --write
-"$OKF/.venv/bin/python" "$OKF/okf.py" --bundle wiki lint
+"$OKF/.venv/bin/python" "$OKF/okf.py" --bundle "$WIKI" index --write
+"$OKF/.venv/bin/python" "$OKF/okf.py" --bundle "$WIKI" lint
 ```
 
 `index` regenerates every `index.md` from concept frontmatter (grouping by
-`type`), preserving hand-written subdirectory descriptions it cannot derive. An
-`index.md` containing `<!-- okf:manual -->` is left untouched.
+`type`, entries reusing each page's L0), preserving hand-written descriptions it
+cannot derive. An `index.md` containing `<!-- okf:manual -->` is left untouched.
 
 `lint` enforces OKF §9 conformance (`E…`) and reports rot (`W…`): broken links,
-orphans, concepts missing from their index, absent `description`/`timestamp`.
-Errors mean the bundle is non-conformant — fix them. Warnings are judgement:
-`W010` on a deliberate forward reference is fine and expected.
+orphans, concepts missing from their index, directories with no index, absent
+`description`/`timestamp`. Errors mean the bundle is non-conformant — fix them.
+Warnings are judgement: `W010` on a deliberate forward reference is fine.
 
 ### A5 — Wire up the read path
 
 A wiki nobody opens is a liability. On bootstrap, add to the **project's**
-`CLAUDE.md` (create it if absent):
+`CLAUDE.md` (create it if absent), matching the bundle's actual directory name:
 
 ```markdown
 ## Project knowledge
@@ -247,63 +288,34 @@ not install hooks unprompted.
 
 ### A6 — Query
 
-Answer from the wiki before reading code. Load `wiki/index.md`, follow links to
-the two or three relevant pages, answer, and cite them by path. This is what
-progressive disclosure (§6) is for.
+Answer from the wiki before reading code, walking the layers in order: load
+`index.md` and scan L0, open the two or three L1 pages that matter, answer, and
+cite them by path. Drop to L2 only when a page points you at code.
 
 If the answer isn't there but was worth asking, that is an ingest signal: offer
 to write it down (A2). If the wiki contradicts the code, **the code wins** —
 then fix the page and log it.
 
-## Scripts
-
-The skill is loaded via a symlink, so **resolve the script by absolute path**;
-`$PWD` is the target project. Set this once per session:
-
-```bash
-OKF=$(dirname "$(readlink -f ~/.claude/skills/llm-wiki)")/llm-wiki/scripts
-# or simply: OKF=~/.claude/skills/llm-wiki/scripts   (symlinks resolve fine)
-```
-
-`okf.py` needs a venv, created on first use from `requirements.txt` (same
-convention as `weekly-meal-plan`; `.venv/` is gitignored). Create it only if
-`"$OKF/.venv/bin/python"` is missing:
-
-```bash
-python3 -m venv "$OKF/.venv" && "$OKF/.venv/bin/pip" install -r "$OKF/requirements.txt"
-```
-
-Always invoke as `"$OKF/.venv/bin/python" "$OKF/okf.py"` — never a system Python.
-It shells out to `git`, so run it from inside the target repo: `--bundle` is
-resolved against `$PWD` and `--repo` defaults to the bundle's git root. All three
-subcommands accept `--json`.
-
-The split is deliberate: the script does what is mechanically checkable
-(conformance, link graph, orphans, git diffs, index rendering). Every judgement
-— what a page should say, whether a diff is cosmetic or semantic, whether a
-coverage gap deserves a page — stays with the model.
-
 ## Gotchas
 
-- `index.md` and `log.md` are **reserved** (§3.1) — never a concept.
-- Only the **root** `index.md` may carry frontmatter (§6). `E004` catches this.
+- `index.md` and `log.md` are **reserved** (§3.1) — never a concept. Only the
+  **root** `index.md` may carry frontmatter (§6); `E004` catches the rest.
 - `sources` globs are **gitignore syntax** matched against `git ls-files`, so
-  untracked files are invisible to coverage. A bare directory is expanded to
-  `dir/**`; any other slash-less pattern (`Makefile`, `*.sql`) is expanded to
+  untracked files are invisible to coverage. A bare directory expands to
+  `dir/**`; any other slash-less pattern (`Makefile`, `*.sql`) expands to
   `**/pattern` so coverage and git-diff pathspecs agree.
-- **The project's `.gitignore` needs no special handling** — coverage only ever
-  sees tracked files, so ignored files are already excluded. Never merge
-  `.gitignore` into `.okfignore`: a file that was committed and *later* ignored
-  stays tracked (git's rule is "tracked beats ignored"), and hiding it would
-  make the wiki look complete when it is not.
-- **Submodules** are the one exception to the `dir/**` expansion. Git records a
-  submodule as a single gitlink entry at its bare path and tracks none of its
-  files in the parent, so `sources: [dep]` is matched exactly and *not* expanded.
-  That makes a pointer bump fire `S001` on the page describing the vendored
-  dependency — the only thing about a submodule the parent repo can observe.
-- Coverage ignores prose, dotfiles, and tests by default. Override with
-  `wiki/.okfignore` (which *replaces* the defaults rather than extending them).
+- **Never merge the project's `.gitignore` into `.okfignore`.** Coverage sees
+  only tracked files, so ignored ones are already excluded — and a file
+  committed *before* being ignored stays tracked, so suppressing it would make
+  the wiki look complete when it is not. Full argument in `okf.py`.
+- **Submodules** are the exception to `dir/**` expansion. Git records a submodule
+  as a single gitlink entry at its bare path and tracks none of its files in the
+  parent, so `sources: [dep]` is matched exactly. A pointer bump then fires
+  `S001` — the only thing about a submodule the parent repo can observe.
+- Coverage ignores prose, dotfiles, tests, `docs/` and vendored trees by default.
+  Override with `<bundle>/.okfignore`, which **replaces** the defaults rather
+  than extending them.
 - A page with no `sources` is never stale by construction. That is a feature —
   prefer timeless pages.
-- Don't mirror `CLAUDE.md` into the wiki, or the repo into `architecture/`. Both
-  create two sources of truth, which is the one thing a wiki must not do.
+- Don't mirror `CLAUDE.md` into the wiki, or the repo tree into `architecture/`.
+  Both create two sources of truth, which is the one thing a wiki must not do.
