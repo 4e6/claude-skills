@@ -36,8 +36,9 @@ $SKILL_DIR/                                     # = <project>/.claude/skills/wee
 │   └── image-providers.md                      # recipe-image provider chain + pitfalls (A6.5)
 └── scripts/
     ├── md-to-pdf.py                            # Markdown → PDF (headless Chromium)
-    ├── requirements.txt                        # Python deps for the renderer (just `markdown`)
-    └── .venv/                                  # local virtualenv (gitignored; created on first render)
+    ├── gen-recipe-images.py                    # recipe photos on the Mac's GPU (A6.5)
+    ├── requirements*.txt                       # pinned deps — one file per script
+    └── .venv*/                                 # one virtualenv per script (gitignored; made on first use)
 ```
 
 - The filename date is **the Monday of that week**, lowercase month: `meal-plan-week-may-18-2026.md`.
@@ -137,9 +138,9 @@ Save to `$SKILL_DIR/plans/meal-plan-week-{month}-{day}-{year}.md` (lowercase mon
 
 ### A6.5. Generate recipe preview images
 
-Each recipe page in the PDF shows a 12 × 8 cm food photo above the title, looked up at `plans/images/week-{month}-{day}-{year}/{slug(dish_title)}.{jpg|jpeg|png|webp}` — the slug being the renderer's own `slugify` (NFKD-normalise → strip combining accents → lowercase → non-alphanumerics replaced with `-` → trim). A missing image falls back to the emoji banner, so **skipping this step is always acceptable**; the rest of the PDF still ships.
+Each recipe page in the PDF shows a food photo above its title. A missing image falls back to an emoji banner, so **skipping this step is always acceptable** — the rest of the PDF still ships.
 
-Read [reference/image-providers.md](reference/image-providers.md) for the provider fallback chain (Composio Gemini → Hugging Face FLUX.1-schnell → Pollinations.ai), the shared prompt template, the download/resize/cache commands, and each provider's pitfalls.
+Read [reference/image-providers.md](reference/image-providers.md) before generating any. Images are produced locally on the Mac's GPU by default ([scripts/gen-recipe-images.py](scripts/gen-recipe-images.py) — no API key, no quota), with a hosted fallback chain behind it; that file carries the venv setup, the job-file format, the filename slug the renderer looks images up by, and each provider's pitfalls.
 
 ### A7. Render the PDF
 

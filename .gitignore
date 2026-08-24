@@ -10,4 +10,5 @@ __pycache__/
 # Local virtualenvs (e.g. weekly-meal-plan/scripts/.venv). Recreated from the
 # adjacent requirements.txt; never committed.
 .venv/
+.venv-imagegen/
 .env

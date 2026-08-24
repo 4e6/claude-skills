@@ -1,0 +1,16 @@
+# Python dependencies for gen-recipe-images.py (local recipe-image generation).
+#
+# Deliberately a SEPARATE venv from requirements.txt: this one pulls mlx + torch +
+# transformers (~1.2 GB installed), and the PDF renderer must not have to carry that
+# just to convert markdown.
+#
+#   /opt/homebrew/bin/python3.14 -m venv .venv-imagegen
+#   .venv-imagegen/bin/pip install -r requirements-imagegen.txt
+#
+# NOTE: use an explicit >=3.10 interpreter, NOT bare `python3`. On macOS the system
+# python3 is 3.9.6, which mflux rejects (requires-python >=3.10). Apple Silicon only —
+# mlx has no x86 build, and the model runs on the Metal GPU.
+#
+# mflux brings mlx, mlx-metal, torch, transformers, pillow and opencv transitively;
+# pinning just the top level keeps this readable and matches requirements.txt.
+mflux==0.19.0
