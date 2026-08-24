@@ -1,6 +1,6 @@
 ---
 name: weekly-meal-plan
-description: Plan, render, and serve weekly triathlon meal plans. Use when the user asks to "make next week's plan", "create a meal plan", "what's today's menu", "show the shopping list", "what's in the fridge", "how do I cook X", or "save this recipe / I liked X". Pulls planned workouts from the TrainingPeaks MCP, generates a Mon→Sun meal plan tailored to training load, renders it (plus per-day recipes) to PDF via headless Chromium, uploads the PDF to the "Meal Plans" folder in Google Drive, and answers follow-up questions during the week from the cached markdown.
+description: Plan, render, and serve weekly triathlon meal plans. Use when the user asks to "make next week's plan", "create a meal plan", "what's today's menu", "show the shopping list", "what's in the fridge", or "how do I cook X". Pulls planned workouts from the TrainingPeaks MCP, generates a Mon→Sun meal plan tailored to training load, renders it (plus per-day recipes) to PDF via headless Chromium, uploads the PDF to the "Meal Plans" folder in Google Drive, and answers follow-up questions during the week from the cached markdown.
 ---
 
 # Weekly meal plan
@@ -31,7 +31,9 @@ $SKILL_DIR/                                     # = <project>/.claude/skills/wee
 │   ├── meal-plan-week-{month}-{day}-{year}.md  # one per week, source of truth and cache
 │   ├── meal-plan-week-{month}-{day}-{year}.pdf # current week's rendered PDF (old ones pruned in A7.5)
 │   └── images/week-{month}-{day}-{year}/        # per-recipe photos for the current week
-├── favorite-recipes.md                         # recipes the user explicitly asked to save
+├── reference/                                  # read on demand during action A only
+│   ├── plan-schema.md                          # the plan .md schema the renderer parses (A4)
+│   └── image-providers.md                      # recipe-image provider chain + pitfalls (A6.5)
 └── scripts/
     ├── md-to-pdf.py                            # Markdown → PDF (headless Chromium)
     ├── requirements.txt                        # Python deps for the renderer (just `markdown`)
@@ -52,8 +54,7 @@ Pick the action that fits the user's request. When ambiguous, default to the lig
 | "today's menu / what am I eating today / what's for [meal]" | **B. Today's menu** |
 | "shopping list", "what do I need to buy" | **C. Shopping list** |
 | "how do I cook / make / prepare X", "recipe for X" | **D. Recipe lookup** |
-| "save this recipe", "I liked the X, save it", "add to favorites" | **E. Save favorite recipe** |
-| "what's in the fridge" (per the plan) | **F. Fridge contents** |
+| "what's in the fridge" (per the plan) | **E. Fridge contents** |
 
 Use parallel tool calls within an action wherever steps are independent (e.g. fetching workouts + fitness from TrainingPeaks).
 
@@ -88,123 +89,7 @@ If TrainingPeaks returns nothing for the week (rest week, off-season, MCP down),
 
 ### A4. Build the meal plan
 
-Follow the existing schema **exactly** — preserve section order and headings so the parser-style lookups in actions B–F keep working:
-
-```markdown
-# Weekly Meal Plan
-**Week of {Mon Month Day}–{Sun Day, Year}**
-
-## Training Overview
-- **Total:** ~{hours} / {TSS}
-- **Hard days:** {day list with session type}
-- **Easy days:** {day list}
-
-{One-line summary on how the meal plan tracks training load.}
-
----
-
-## Meal Plan
-
-### Monday — {session(s) or "Recovery"}
-- **Breakfast:** ...
-- **Lunch:** ...
-- **Dinner:** ...
-- (Training days add: **Pre-{session}:**, **During {session}:**, **Post-{session}:**)
-
-### Tuesday — ...
-... (through Sunday)
-
----
-
-## Already in the Fridge
-- Item 1
-- Item 2
-
----
-
-## Shopping List
-
-### Proteins
-- [ ] Item (Portuguese name) — qty (Day[, Day…])
-
-### Carbs
-### Fruit
-### Vegetables
-### Legumes & Pantry
-### Nuts & Extras
-### Training-specific
-
----
-
-## Recipes
-
-### Monday
-#### {Monday's breakfast dish}
-**Meal:** Breakfast
-**Per serving:** ...
-**Time:** ...
-
-**Ingredients (1 serving)**
-- ...
-
-**Steps**
-1. ...
-
-#### {Monday's lunch dish}
-**Meal:** Lunch
-... (full recipe — metadata + Ingredients + Steps)
-
-#### {Monday's dinner dish}
-**Meal:** Dinner
-... (full recipe)
-
-### Tuesday
-... (every day lists Breakfast, Lunch and Dinner — one #### entry per main meal, in that order, through Sunday)
-
-#### {Tuesday's lunch — same dish as an earlier day, or a leftover from a batch}
-**Meal:** Lunch
-**Per serving:** ...
-**Time:** ...
-
-*Leftover from Monday's lentil-soup batch — reheat. See Monday — Lentil soup.*
-
-#### Per-recipe metadata (required)
-
-Every `#### {Dish}` heading must be followed by three metadata lines, before the `**Ingredients**` block (or before the pointer line, for a repeat/leftover). They drive the meal label in the per-day table of contents and recipe eyebrow, plus the Prep/Cook/Kcal/Fats/Carbs/Protein/Fibre table at the bottom of each recipe page:
-
-```markdown
-#### Spaghetti bolognese
-**Meal:** Dinner
-**Per serving:** 680 kcal · 38 g protein · 22 g fat · 84 g carbs · 7 g fibre
-**Time:** 15 min prep · 35 min cook
-
-**Ingredients (3 servings — 1 Thu dinner, 1 Sat dinner, 1 Sun lunch)**
-- ...
-```
-
-When a recipe is batch-cooked, the serving line must name where every serving goes (see the portion-conservation rule below) — not just "reserve half".
-
-Field rules:
-- **Meal** — `Breakfast`, `Lunch`, or `Dinner`. Required on **every** entry so the reader can scan a day's meals. Keep the `####` title the plain dish name (no "Breakfast — " prefix) — the renderer reads the slot from this line, and the title's slug is what the recipe image and anchor link are keyed on.
-- **Per serving** — kcal first, then protein/fat/carbs/fibre. Units `g` are optional but recommended. Separators can be `·`, `•`, or `|`. Values are estimates — fine to round to 5 kcal / 1 g. For multi-serving recipes (bolognese, etc.), values are **per serving**, not for the whole pot.
-- **Time** — `N min prep · N min cook`. Either field can be omitted; `0 min cook` is valid for no-cook dishes. For a leftover, `0 min prep · 3 min reheat` is fine.
-- **Repeat / leftover pointer** — when an entry reuses a dish cooked on an earlier day, give the three metadata lines (values reflect *this* day's portion — e.g. Friday's "Big oats bowl" has higher kcal than Wednesday's oats), then **one italic pointer line in place of Ingredients/Steps**. Use one of these phrasings so the renderer can hyperlink the day to the origin recipe:
-  - Same dish cooked fresh again: `*Same as Wednesday — Eggs on toast.*`
-  - Eating a batch leftover: `*Leftover from Thursday's bolognese batch — reheat. See Thursday — Spaghetti bolognese.*`
-  - The linkable phrase must read `See {Day} — {Dish}` or `Same as {Day} — {Dish}`, end with a period, and the `{Dish}` must match the origin entry's `####` title (substring, case-insensitive). The origin entry — the one with the full recipe — lives on the day the dish is first cooked.
-
-An optional `**Image:**` line (alongside the metadata lines) — **only add it if auto-detection picks the wrong category** (which it almost never does; skip it by default):
-
-```markdown
-**Image:** chicken
-```
-
-This controls the category-themed preview banner at the top of the recipe page (gradient colour + central food emoji). Categories: `eggs`, `oats`, `pasta`, `chicken`, `fish`, `salad`, `chickpea`, `yogurt`, `bread`, `rice`, `default`. The renderer auto-picks from the dish title using keyword priority (eggs → oats → pasta → chicken → fish → chickpea → salad → yogurt → bread → rice → default), so e.g. "Tuna pasta salad" lands on `pasta`, "Sardines + boiled potatoes + tomato salad" on `fish`. You can also pass a custom emoji: `**Image:** 🥑 default`.
-
----
-
-*{Closing note on where to shop, e.g. "Pingo Doce, Continente, and Lidl all cover this. Lidl tends to be cheapest for nuts, oats, and frozen fish."}*
-```
+Follow the schema in [reference/plan-schema.md](reference/plan-schema.md) **exactly** — read that file now if you haven't already this session. It carries the document skeleton, the required per-recipe metadata lines, and how the Recipes section is organised day by day. `parse_plan()` in `scripts/md-to-pdf.py` parses those headings and bullet shapes directly, so any deviation silently drops content from the PDF.
 
 #### Domain rules — follow when filling in the plan
 
@@ -225,24 +110,20 @@ This controls the category-themed preview banner at the top of the recipe page (
 - **Reference supermarkets.** Pingo Doce, Continente, Lidl. The closing note typically flags which is cheapest for specific categories.
 - **Athlete is a triathlete** (swim/bike/run + core/plyometrics). Don't suggest meals that conflict with that (e.g. very heavy/fatty pre-session meals).
 
-#### Recipes section — per-day organization
-
-The Recipes section is a **day-by-day overview**: the reader flips to a day and sees that whole day's eating. So it lists *every* main meal of *every* day — never silently dropping a meal because the dish appeared earlier.
-
-- **One `#### {Dish}` entry per main meal, every day.** For each `### {Day}`, emit Breakfast, then Lunch, then Dinner (whichever the Meal Plan lists for that day — usually all three), in that order. Each entry carries its `**Meal:**` line. This is what makes the per-day table of contents at the top of the section show the full day at a glance.
-- **Scope: the three main meals only.** Pre-/during-/post-session fuel (bananas, dates, energy bars, chocolate milk, isotonic) stays in the Meal Plan section and does *not* get a recipe entry — it needs no recipe and would clutter the day overview.
-- **Origin entry = full recipe.** The day a dish is first cooked gets the full recipe: 4–8 ingredients with quantities (1 serving unless the dish is built for leftovers — bolognese, etc.), then 3–7 numbered steps. Keep it tight; this is a working kitchen reference, not a cookbook.
-- **Repeat / leftover entry = pointer, not a re-print.** If a day's meal reuses a dish cooked earlier, still give it its own `#### {Dish}` entry with the `**Meal:**`/`**Per serving:**`/`**Time:**` lines, but replace Ingredients/Steps with a single italic pointer line (`*Same as … — …*` or `*Leftover from … — reheat. See … — ….*`) per the metadata rules above. The renderer links it back to the origin recipe, so the reader still gets one tap to the method.
-- **Keep dish titles stable.** Use the same `#### {Dish}` title on the repeat/leftover day as on the origin day (the link resolves by matching that title). Don't encode the meal slot into the title — that's the `**Meal:**` line's job.
-- Also check `favorite-recipes.md` first — if the user has saved a version of a dish there, prefer that version (it's their preferred way).
-
 ### A5. Final consistency pass
 
 Four checks before declaring the plan done:
 
 **1. Ingredient coverage (recipe → shopping list).** Walk every dish across all seven days and confirm every ingredient is either in **Already in the Fridge** or on the **Shopping List**. Add anything missing — named herbs, spices, condiments — including training-load-scaled quantities (bananas, dates, energy bars, chocolate milk). As you walk, **build an ingredient → days index**: read each ingredient straight off the recipe's **Ingredients** block (never off the dish's name or archetype) and record every day whose *written* recipe lists it. That index — not your memory of the week — is the source of truth for the usage-day tags. This direction catches ingredients that are *used but not bought*.
 
-**2. Usage-day tag audit (shopping list → recipe).** The opposite direction, run as a separate pass — do not fold it into check 1. For **every** shopping-list item, take the day(s) in its `(…)` tag and, for each one, open that day's recipes and confirm the item **literally appears** in a written **Ingredients** block. Delete any day you can't confirm; add any day that check 1's index has but the tag is missing. The tag's day set must equal the index's day set for that item — no extra days, no missing days.
+**2. Usage-day tag audit (shopping list → recipe).** The opposite direction, run as a separate pass — do not fold it into check 1. For **every** shopping-list item, take the day(s) in its `(…)` tag and confirm, for each one, that the day genuinely uses the item. Delete any day you can't confirm; add any day that check 1's index has but the tag is missing. The tag's day set must equal the index's day set for that item — no extra days, no missing days.
+
+   Where a day's use is written down — check all three places before deleting a tag:
+   - **The day's own Ingredients block**, for a dish cooked fresh that day.
+   - **The origin recipe's Ingredients block**, for a repeat or leftover entry. Follow the `See {Day} — {Dish}` / `Same as {Day} — {Dish}` pointer and read the ingredients *there*. Pointer entries carry no Ingredients block of their own **by design**, so "the item isn't written on this day" is never on its own grounds to drop the day — Wednesday still eats the oats when its porridge entry is `*Same as Monday*`.
+   - **The day's Meal Plan bullets**, for anything that never gets a recipe entry at all: pre-/during-/post-session fuel (bananas, dates, gels, bars, isotonic, chocolate milk), and extras named only inside a pointer's note (*"grate the reserved parmesan over it"*).
+
+   Two things to keep in mind:
    - This is the *only* check that catches a tag naming a day that doesn't use the item: check 1 walks recipe → list and never visits an item on a day that doesn't list it, so it structurally cannot see an over-tagged day.
    - The failure mode is tagging from the dish's *archetype* instead of its *written recipe*. A "chicken & veg stir-fry" or "veg omelette" reads like it contains onion and mushrooms, so those days get tagged out of habit — but if the recipe you actually wrote lists carrot/pepper/courgette instead, the tag is wrong. Real example this guards against: `Mushrooms — 1 pack (Tue, Fri)` when only Friday's two dishes list mushrooms and Tuesday's stir-fry doesn't — the correct tag is `(Fri)`.
 
@@ -256,107 +137,9 @@ Save to `$SKILL_DIR/plans/meal-plan-week-{month}-{day}-{year}.md` (lowercase mon
 
 ### A6.5. Generate recipe preview images
 
-Each recipe page in the PDF shows a 12 × 8 cm food photo above the title. The renderer looks each one up at `plans/images/week-{month}-{day}-{year}/{slug(dish_title)}.{jpg|jpeg|png|webp}`. The slug uses the same `slugify` logic the renderer uses: NFKD-normalise → strip combining accents → lowercase → non-alphanumerics replaced with `-` → trim. If the images dir doesn't exist or a specific dish is missing, the renderer silently falls back to the emoji banner — skipping is always acceptable; the rest of the PDF still ships.
+Each recipe page in the PDF shows a 12 × 8 cm food photo above the title, looked up at `plans/images/week-{month}-{day}-{year}/{slug(dish_title)}.{jpg|jpeg|png|webp}` — the slug being the renderer's own `slugify` (NFKD-normalise → strip combining accents → lowercase → non-alphanumerics replaced with `-` → trim). A missing image falls back to the emoji banner, so **skipping this step is always acceptable**; the rest of the PDF still ships.
 
-**Provider fallback chain.** Try in order; stop at the first one that returns images:
-
-1. **Composio Gemini MCP** (primary, best quality) — see below
-2. **Hugging Face Z-Image Turbo MCP** (free, authenticated) — see below
-3. **Pollinations.ai** (zero-auth last-resort fallback) — see below
-
-**Shared prompt template** (works for both providers — keep neutral and concrete; brand names trigger recitation blocks on Gemini):
-
-```
-Food photography, top-down view: {plainspoken dish description with key ingredients}.
-Rustic ceramic plate/bowl, natural daylight, clean wooden table, minimal styling,
-soft shadows, magazine quality, no text, no logos.
-```
-
-#### Option 1: Composio Gemini MCP
-
-Call the Composio **GEMINI_GENERATE_IMAGE** tool (`gemini-2.5-flash-image`, aspect_ratio `3:2`). The connection is already active on Composio (toolkit `gemini`).
-
-**Batching.** Composio's pitfall note recommends ≤3 concurrent calls to avoid 429s, but in practice batches of 5–9 via `COMPOSIO_MULTI_EXECUTE_TOOL` succeed. For ~20 recipes, two batches is enough.
-
-**Download + resize + cache.** Each Gemini result has a presigned `data.image.s3url` that expires in ~1 hour — download immediately. The originals are ~1.7 MB PNGs at 1248×832, which would bloat the PDF; resize and re-encode as JPEG q85 at 800×533 (3:2) — keeps each image ~80–110 KB and adds ~1.8 MB to the PDF total.
-
-```bash
-# After downloading {dish-slug}.png from the presigned s3url:
-SKILL_DIR=<base directory from skill launch>
-WEEK_DIR="$SKILL_DIR/plans/images/week-{month}-{day}-{year}"
-mkdir -p "$WEEK_DIR"
-magick {dish-slug}.png -resize '800x533!' -quality 85 -interlace JPEG \
-    -sampling-factor 4:2:0 -strip \
-    "$WEEK_DIR/{dish-slug}.jpg"
-```
-
-#### Option 2: Hugging Face FLUX.1-schnell via dynamic_space (fallback)
-
-Free image generation via the `hf-mcp-server` MCP. Uses Black Forest Labs' `FLUX.1-schnell` (4-step turbo diffusion), reached through `mcp__hf-mcp-server__dynamic_space` (the generic Space-invocation tool) targeting the curated `evalstate/flux1_schnell` Space. Login is already wired up (authenticated as user `4e6`).
-
-Why this specific Space and not a typed tool: HF's MCP server exposes one typed tool per pre-registered Space, and the only typed image-gen tool currently registered is Z-Image Turbo (`mcp__hf-mcp-server__gr1_z_image_turbo_generate`). Z-Image Turbo reserves **~60 s of ZeroGPU time per call**, which only fits 2–3 images into the free 5-min daily ZeroGPU budget. `evalstate/flux1_schnell` reserves **~10 s per call**, fits ~30 images in the same budget — enough for a full 20-recipe week. Quality at 4 inference steps is comparable for food photography.
-
-```text
-mcp__hf-mcp-server__dynamic_space(
-    operation="invoke",
-    space_name="evalstate/flux1_schnell",
-    parameters='{"prompt": "<shared prompt template, filled in>", "width": 1248, "height": 832, "num_inference_steps": 4, "randomize_seed": true}',
-)
-```
-
-Parameter rules:
-- `parameters` is a **JSON-encoded string**, not an object. Pass `'{"prompt": "..."}'` literally.
-- `prompt` should be ≲60–70 words (Space-level limit; the shared template fits comfortably).
-- `width`/`height` accept any multiples of 8 — `1248×832` matches the 3:2 banner crop the renderer wants.
-- Keep `num_inference_steps=4` (the schnell sweet spot; 8 doubles GPU cost without visible quality gain).
-
-The tool result contains an inline preview and an `Image URL:` line pointing at a Gradio temp file (typically `https://evalstate-flux1-schnell.hf.space/.../image.webp` or similar). Download immediately and resize to 800×533 — same magick invocation as the Gemini branch, just starting from a `.webp`:
-
-```bash
-SKILL_DIR=<base directory from skill launch>
-WEEK_DIR="$SKILL_DIR/plans/images/week-{month}-{day}-{year}"
-mkdir -p "$WEEK_DIR"
-
-curl -sS --fail --max-time 90 -o /tmp/{dish-slug}.webp "<image-url-from-tool-output>"
-
-magick /tmp/{dish-slug}.webp -resize '800x533!' -quality 85 -interlace JPEG \
-    -sampling-factor 4:2:0 -strip \
-    "$WEEK_DIR/{dish-slug}.jpg"
-```
-
-**Pitfalls.**
-- Tool output is a tuple — the inline preview image in the conversation is *not* what gets saved; always parse the `Image URL:` line and `curl` it. Skipping the curl step leaves you with no on-disk file.
-- The Space returns `.webp`. ImageMagick reads it transparently.
-- **ZeroGPU quota is per-user, shared across all ZeroGPU Spaces** (it's not per-Space). Free authenticated quota is **5 min/day**, PRO is 40 min/day. At ~10 s per `flux1_schnell` call, free covers ~30 images/day — a full week in one sitting, with margin. But: if you burn the budget on Z-Image Turbo earlier in the same UTC day (60 s/call), there's no separate budget for FLUX. Treat it as one wallet.
-- Quota errors look like `ZeroGPU quota exceeded (10s requested vs. 0s left)`. The "Try again in 0:00:00" hint is bogus — actual reset is 24 h after the day's first GPU use. When this fires, fall through to Pollinations for the remaining dishes; don't loop-retry.
-- **Don't fire in parallel.** ZeroGPU runs each call sequentially under a queue — parallel tool calls in one assistant turn don't generate in parallel and can race the quota check. Issue them one at a time (or with low concurrency, 2–3 max).
-- Quality at 4 steps is good for plated-food banners; slightly below Gemini for hero/cover shots. If a specific dish comes out poorly, retry once with a tweaked prompt before falling through to Pollinations.
-
-#### Option 3: Pollinations.ai (last-resort fallback)
-
-Zero-auth HTTP endpoint backed by FLUX. Returns a 800×533 JPEG directly — **no resize / no ImageMagick step needed**, just save the response body.
-
-```bash
-SKILL_DIR=<base directory from skill launch>
-WEEK_DIR="$SKILL_DIR/plans/images/week-{month}-{day}-{year}"
-mkdir -p "$WEEK_DIR"
-
-# URL-encode the prompt (python3 one-liner — bash doesn't have a builtin):
-PROMPT="Food photography, top-down view: {dish description}. Rustic ceramic plate/bowl, natural daylight, clean wooden table, minimal styling, soft shadows, magazine quality, no text, no logos."
-ENCODED=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1]))" "$PROMPT")
-
-curl -sS --fail --max-time 120 \
-    -o "$WEEK_DIR/{dish-slug}.jpg" \
-    "https://image.pollinations.ai/prompt/${ENCODED}?width=800&height=533&nologo=true"
-```
-
-**Pitfalls.**
-- Latency is ~30–90 s per image (synchronous generation). Run ≥4 in parallel with `&` + `wait` to keep total time under ~2 min for 20 recipes.
-- Occasional 502 / empty response / HTTP 402 — retry once before falling back to the emoji banner for that one dish.
-- **Do not pass `model=flux`** — as of 2026 it returns HTTP 402 (paid tier). The default model is free and produces good food photography. If Pollinations adds another free model identifier later, test it before switching.
-- `nologo=true` strips the Pollinations watermark. Required for a clean PDF.
-
-**Final PDF size** with images from either provider: ~2.5–3 MB.
+Read [reference/image-providers.md](reference/image-providers.md) for the provider fallback chain (Composio Gemini → Hugging Face FLUX.1-schnell → Pollinations.ai), the shared prompt template, the download/resize/cache commands, and each provider's pitfalls.
 
 ### A7. Render the PDF
 
@@ -382,7 +165,7 @@ The renderer is **not** a plain markdown-to-HTML dump — it parses the schema i
 
 ### A7.5. Clean up previous weeks' artifacts
 
-Once the new PDF exists locally, remove old PDFs and image directories from `plans/` — but keep every `.md` (those are the historical record and the cache that actions B–F read).
+Once the new PDF exists locally, remove old PDFs and image directories from `plans/` — but keep every `.md` (those are the historical record and the cache that actions B–E read).
 
 ```bash
 WEEK_STEM="meal-plan-week-{month}-{day}-{year}"
@@ -451,24 +234,12 @@ Two-line summary max: the training overview line ("~10:50 / 536 TSS, hard days W
 
 1. Find the current week's plan file (or the file the user references — "from last week").
 2. Look up the dish under `## Recipes` by case-insensitive substring match on the `#### {Dish}` headings.
-3. Also check `favorite-recipes.md` — if the dish exists there, prefer that version (it's the saved/preferred one) and mention briefly: *"Using your saved version."*
-4. If the dish is in the meal plan but not in the Recipes section (older file from before this skill, or a fueling snack), generate the recipe on the fly using the same per-recipe format (4–8 ingredients, 3–7 steps), then **append it to the Recipes section of that week's file** so it's there for next time.
-5. If the dish is nowhere — the user is asking about something not on the plan — generate a recipe but do NOT write it into the weekly plan (it's not part of that week). Offer to save it as a favorite if they want.
+3. If the dish is in the meal plan but not in the Recipes section (older file from before this skill, or a fueling snack), generate the recipe on the fly using the same per-recipe format (4–8 ingredients, 3–7 steps), then **append it to the Recipes section of that week's file** so it's there for next time.
+4. If the dish is nowhere — the user is asking about something not on the plan — generate a recipe but do NOT write it into the weekly plan (it's not part of that week).
 
 ---
 
-## E. Save favorite recipe
-
-Trigger phrases: "save this", "I liked the X, save it", "add to favorites", "remember this recipe".
-
-1. Identify which dish the user means. Usually it's the one just discussed in this conversation — quote the dish name back briefly to confirm if there's any ambiguity (more than one dish in recent turns).
-2. Locate the recipe — current week's plan first, then `favorite-recipes.md` (already saved → tell the user and stop), then generate fresh if needed.
-3. Append to `$SKILL_DIR/favorite-recipes.md` (resolved per Path resolution) using the format shown at the top of that file. Today's date for `*Saved {YYYY-MM-DD}*`. Reference the week of origin if known.
-4. One-line confirmation: *"Saved 'Bolognese with pasta' to favorites."*
-
----
-
-## F. Fridge contents
+## E. Fridge contents
 
 Return the `## Already in the Fridge` section of the current week's plan verbatim. If the user wants to update it ("add chorizo to the fridge"), edit that section in the file in-place. Don't regenerate the plan unless they ask.
 
@@ -481,4 +252,3 @@ Return the `## Already in the Fridge` section of the current week's plan verbati
 - **Don't refetch profile basics** (FTP, zones, A-race) within one conversation unless the user just changed them.
 - **Don't generate the PDF speculatively** — only as part of action A (creating a week). Querying actions read the cached `.md` and never touch chromium.
 - **If the renderer's venv is missing/broken**, recreate it from the pinned requirements: `python3 -m venv "$SKILL_DIR/scripts/.venv" && "$SKILL_DIR/scripts/.venv/bin/pip" install -r "$SKILL_DIR/scripts/requirements.txt"` (the A7 snippet does this automatically on first run). **If `chromium` is missing**, ask the user to reinstall it (`pacman -S chromium` on Arch) — it's a system binary, not a Python package, so it can't go in the venv. Do not fall back to a different renderer silently; the layout is tuned for this pipeline.
-- **The repo at `~/projects/4e6/meal-plans/` was the origin of this skill** and is being deleted. The current week (May 11–17, 2026) was migrated to `plans/` so action B works immediately. After the repo is gone, the skill is fully self-contained.
