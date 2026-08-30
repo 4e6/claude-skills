@@ -51,6 +51,16 @@ OKF_KEYS = {"type", "title", "description", "resource", "tags", "timestamp"}
 L0_MAX_CHARS = 250
 L0_MIN_CHARS = 40
 
+# Statuses meaning "still a true record, no longer the live answer". `index`
+# sinks these to a trailing section so a scan meets what governs first, and only
+# reads history if it keeps going. They are never deleted — a Decision is an
+# event, and the reasoning in a superseded one routinely outlives the choice.
+#
+# `amended` is deliberately absent: an amended decision still governs in part,
+# so demoting it would hide a live answer. Its L0 says what amended it instead.
+RETIRED_STATUS = {"superseded", "answered"}
+RETIRED_HEADING = "No longer current"
+
 # Paths that never warrant a wiki concept. Overridable via <bundle>/.okfignore.
 # Prose and dotfiles are excluded outright: the wiki *is* the prose layer, and a
 # coverage report that nags about README.md teaches you to ignore it.
@@ -622,16 +632,25 @@ def render_index(directory: Path, bundle: Bundle) -> str:
     if is_root:
         lines += ["---", 'okf_version: "0.1"', "---", ""]
 
+    def entry_for(doc: Doc) -> str:
+        entry = f"* [{doc.title}]({doc.path.name})"
+        desc = doc.description or kept.get(doc.path.name, "")
+        return f"{entry} - {desc}" if desc else entry
+
     for type_name in sorted(groups):
+        by_title = sorted(groups[type_name], key=lambda d: d.title.lower())
+        live = [d for d in by_title if str(d.meta.get("status", "")).lower() not in RETIRED_STATUS]
+        retired = [d for d in by_title if d not in live]
+
         lines.append(f"# {type_name}")
         lines.append("")
-        for doc in sorted(groups[type_name], key=lambda d: d.title.lower()):
-            entry = f"* [{doc.title}]({doc.path.name})"
-            desc = doc.description or kept.get(doc.path.name, "")
-            if desc:
-                entry += f" - {desc}"
-            lines.append(entry)
+        lines += [entry_for(doc) for doc in live]
         lines.append("")
+        if retired:
+            lines.append(f"## {RETIRED_HEADING}")
+            lines.append("")
+            lines += [entry_for(doc) for doc in retired]
+            lines.append("")
 
     if subdirs:
         lines.append("# Subdirectories")
