@@ -39,6 +39,18 @@ MANUAL_MARKER = "<!-- okf:manual -->"
 # Frontmatter keys OKF defines. Anything else is a producer extension (§4.1).
 OKF_KEYS = {"type", "title", "description", "resource", "tags", "timestamp"}
 
+# L0 is a scan line: every index entry is read on the way to any single page, so
+# its cost is paid by every query and not just the relevant one. The ceiling is a
+# character budget rather than a sentence count because what costs a reader is
+# length — a rambling one-sentence L0 is worse than two crisp ones.
+#
+# The floor catches truncation, which is silent and does not look like an error.
+# An unquoted `#` opens a YAML comment and an unquoted `: ` breaks the mapping,
+# so `description: White on #0091d9 measures 3.47:1` parses as "White on" and
+# every check downstream passes on the two words that are left.
+L0_MAX_CHARS = 250
+L0_MIN_CHARS = 40
+
 # Paths that never warrant a wiki concept. Overridable via <bundle>/.okfignore.
 # Prose and dotfiles are excluded outright: the wiki *is* the prose layer, and a
 # coverage report that nags about README.md teaches you to ignore it.
@@ -305,6 +317,20 @@ def lint(bundle: Bundle) -> tuple[list[dict], list[dict]]:
             err("E003", doc.rel, "frontmatter has no non-empty `type` field")
         if not doc.description:
             warn("W013", doc.rel, "no `description` (index entries and previews use it)")
+        elif len(doc.description) > L0_MAX_CHARS:
+            warn(
+                "W017",
+                doc.rel,
+                f"`description` is {len(doc.description)} chars; L0 is a scan line read on "
+                f"the way to every page, so budget {L0_MAX_CHARS}. Move the detail into the body",
+            )
+        elif len(doc.description) < L0_MIN_CHARS:
+            warn(
+                "W017",
+                doc.rel,
+                f"`description` is only {len(doc.description)} chars — a stub, or truncated by "
+                "an unquoted `#` starting a YAML comment. Quote it and check it reads whole",
+            )
         if not doc.meta.get("timestamp"):
             warn("W014", doc.rel, "no `timestamp`")
         tags = doc.meta.get("tags")

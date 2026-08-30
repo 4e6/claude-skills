@@ -60,9 +60,18 @@ resolutions. Always know which one you are writing or reading:
 
 | Layer | Lives in | Size | Read when |
 |---|---|---|---|
-| **L0** — abstract | `description:` frontmatter, surfaced in `index.md` | one sentence | scanning for relevance |
+| **L0** — abstract | `description:` frontmatter, surfaced in `index.md` | ≤250 chars | scanning for relevance |
 | **L1** — the page | the concept body | a screen | the page looks relevant |
 | **L2** — ground truth | the code itself, reached via `sources:` | unbounded | you need specifics |
+
+**L0 is a budget, not a sentence count.** Every index entry is read on the way
+to any single page, so its cost is paid by every query rather than by the one
+query it answers — which makes length the thing to hold, and full stops a poor
+proxy for it. A rambling 250-character single sentence is worse than two crisp
+eighty-character ones. `lint` warns above 250 (`W017`), and warns *below* 40 as
+well: a description that short is usually a stub, or a line YAML truncated at an
+unquoted `#`, which is silent and looks like nothing at all. When a page will not
+fit the budget, that is the signal its detail belongs in the body.
 
 **The wiki is L0 and L1 only; it never becomes L2.** The code is already a
 perfect copy of itself, so a page that reproduces it creates a second source of
@@ -108,7 +117,7 @@ producer extension. Use these, and nothing else, so the scripts can reason:
 ---
 type: Module                    # REQUIRED. From reference/concept-types.md.
 title: Auth                     # recommended
-description: One sentence.      # recommended — this is L0; indexes reuse it verbatim
+description: One or two.        # recommended — this is L0, ≤250 chars; indexes reuse it verbatim
 tags: [auth]                    # recommended
 timestamp: 2026-07-10T09:00:00Z # recommended — last *meaningful* change
 resource: https://…             # only if a canonical external asset exists
@@ -187,7 +196,7 @@ fact during other work.
    If nothing fits, it probably fails the half-life rule.
 2. Check for an existing page first — **update in place rather than adding a
    near-duplicate**. Two pages that disagree are the main failure mode of a wiki.
-3. Write the page: a one-sentence `description` (L0) and a body that stops at L1.
+3. Write the page: a `description` inside L0's budget and a body that stops at L1.
    Prefer headings/lists/tables over prose (§4.2). Cite external claims under
    `# Citations` (§8).
 4. Cross-link both ways: the new page links its neighbours, and at least one
