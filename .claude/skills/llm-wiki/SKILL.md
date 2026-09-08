@@ -293,14 +293,23 @@ their rationale, invariants, domain vocabulary, gotchas — lives in an OKF
 knowledge bundle at [wiki/](wiki/). **Start at [wiki/index.md](wiki/index.md)**
 and drill down; don't read the whole bundle.
 
-Keep it current: a change that alters a boundary, a decision, an invariant, a
-data model, or an integration must update the wiki in the same commit.
+Wiki updates land in the same commit as the change, never as a follow-up.
 ```
 
+**Write it to the project's `CLAUDE.md`, never to `~/CLAUDE.md`.** A copy in the
+home directory says *this project* while applying to every project opened on that
+machine, including the ones with no bundle at all — and it hard-codes one
+bundle's directory name into all of them.
+
 That last sentence is the highest-leverage sync mechanism in this skill — same
-commit, same review, no drift. Optionally offer a `SessionStart` hook running
-`okf.py stale` for a once-per-session nudge (use the `update-config` skill); do
-not install hooks unprompted.
+commit, same review, no drift. **Keep the snippet to those two things**, the read
+path and that rule. A trigger list in it — *a boundary, a decision, an
+invariant…* — only duplicates this skill's own `description`, and the word
+*decision* sitting in it reads as naming a destination rather than an occasion;
+which section a page belongs in is
+[reference/concept-types.md](concept-types.md)'s job. Optionally offer a
+`SessionStart` hook running `okf.py stale` for a once-per-session nudge (use the
+`update-config` skill); do not install hooks unprompted.
 
 ### A6 — Query
 

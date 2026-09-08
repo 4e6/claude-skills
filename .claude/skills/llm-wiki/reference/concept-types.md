@@ -27,6 +27,28 @@ that is a strong hint it belongs in the code, not the wiki.
 are the ones the sync loop touches most. Keep them about **responsibility and
 boundaries**, never about function signatures.
 
+## `Decision` or `Module`?
+
+The two most-confused types, and the confusion runs one way: `decisions/` gets
+reached for by default, because the word *decision* appears in the trigger list
+of almost every prompt about recording knowledge. Being a trigger does not make
+it a destination. Two rules settle nearly every case.
+
+**A `Decision` is written about something that already happened.** It records a
+fork taken, under the constraints in play at the time, and it is dated and
+numbered because both of those are claims about a moment. An ADR for a design
+that has not been built is a plan with a permanent number on it, and the number
+outlives the plan changing. If no live alternative existed that somebody might
+re-litigate, it is not a decision — whatever else it is.
+
+**A new surface is a `Module`, and often a `Module` *and* the decisions behind
+it.** The page says what the thing is, what it owns and where it stops; the ADRs
+say why it is not the alternative. Describing and justifying are different jobs,
+and a `Module` that re-argues its own ADRs — or a `Decision` that inventories a
+surface — is doing the other one badly. Link them instead: the module names its
+decisions in a short section and delegates every *why* to them, so neither page
+repeats the other and superseding one does not strand the other.
+
 ---
 
 ## Templates
@@ -105,7 +127,9 @@ Customers are double-charged. See [refund playbook](/playbooks/refunds.md).
 ### Module
 
 Responsibility and edges. **No signatures, no line numbers, no file trees** —
-those are what the code is for, and they rot within days.
+those are what the code is for, and they rot within days. Name the decisions
+behind the surface and let them carry the *why*; see [`Decision` or
+`Module`?](#decision-or-module).
 
 ```markdown
 ---
@@ -128,6 +152,11 @@ records — that is [accounts](/architecture/accounts.md).
 * Everything outside this module reaches auth through `verifySession()`. No
   other module reads the session cookie directly.
 * Talks to [Redis](/integrations/redis.md) for the revocation list only.
+
+# Decisions
+
+* [JWTs for service-to-service auth](/decisions/0004-jwt-auth.md) — why this is
+  stateless, and what a shared session store would have cost.
 
 # Invariants
 
