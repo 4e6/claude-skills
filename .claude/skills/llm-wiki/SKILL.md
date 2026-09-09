@@ -89,6 +89,8 @@ what lets a single commit change behaviour and the knowledge about it together.
 <project>/
 ├── CLAUDE.md            # points at the wiki (see A5) — this is the read path
 └── wiki/                # the OKF bundle root (some projects use .wiki/)
+    ├── CLAUDE.md        # how to edit this bundle — loads on demand (see A5)
+    ├── AGENTS.md        # the same, for agents that do not read CLAUDE.md
     ├── index.md         # okf_version: "0.1"; the only index with frontmatter
     ├── log.md           # newest-first, ISO-dated change history
     ├── overview.md      # type: Overview
@@ -107,6 +109,11 @@ what lets a single commit change behaviour and the knowledge about it together.
 
 Create directories lazily — only when a real page needs one. An empty
 `gotchas/` teaches nothing.
+
+`CLAUDE.md` and `AGENTS.md` are instructions rather than knowledge, so `okf.py`
+ignores them at every level: they are never concepts, never indexed, never stale.
+Everything else ending in `.md` **is** a concept — there is no third category, and
+a stray notes file in the bundle will be linted as a page missing its `type`.
 
 ## Frontmatter contract
 
@@ -180,7 +187,7 @@ coverage gap deserves a page — stays with the model.
    `Module` per genuine subsystem, and any `Decision` / `Gotcha` the user
    volunteers. **Ten good pages beat sixty generated ones.**
 4. For pages with `sources`, set `source_commit` to `git rev-parse HEAD`.
-5. Do A5 (wire up the read path), then A4 (index + lint).
+5. Do A5 (wire up the read and write paths), then A4 (index + lint).
 6. Seed `log.md` with a `**Initialization**` entry.
 
 Never invent facts to fill a template. If you don't know why a decision was
@@ -280,10 +287,15 @@ orphans, concepts missing from their index, directories with no index, absent
 `description`/`timestamp`. Errors mean the bundle is non-conformant — fix them.
 Warnings are judgement: `W010` on a deliberate forward reference is fine.
 
-### A5 — Wire up the read path
+### A5 — Wire up the read and write paths
 
-A wiki nobody opens is a liability. On bootstrap, add to the **project's**
-`CLAUDE.md` (create it if absent), matching the bundle's actual directory name:
+Three files, doing two different jobs. Run this on bootstrap, and on any existing
+bundle that predates it — the files are additive and nothing else has to change.
+
+#### The read path: the project's `CLAUDE.md`
+
+A wiki nobody opens is a liability. Add to the **project's** `CLAUDE.md` (create
+it if absent), matching the bundle's actual directory name:
 
 ```markdown
 ## Project knowledge
@@ -307,9 +319,67 @@ path and that rule. A trigger list in it — *a boundary, a decision, an
 invariant…* — only duplicates this skill's own `description`, and the word
 *decision* sitting in it reads as naming a destination rather than an occasion;
 which section a page belongs in is
-[reference/concept-types.md](concept-types.md)'s job. Optionally offer a
-`SessionStart` hook running `okf.py stale` for a once-per-session nudge (use the
-`update-config` skill); do not install hooks unprompted.
+[reference/concept-types.md](concept-types.md)'s job.
+
+#### The write path: `CLAUDE.md` and `AGENTS.md` **inside** the bundle
+
+The read path tells an agent the wiki exists. It does not reach the agent that is
+already editing a page — one asked to fix a stale sentence, or landing a wiki
+update alongside a code change. That agent needs the frontmatter contract, the
+concept types and the index/lint steps, and it has no reason to know this skill
+is what carries them.
+
+A nested `CLAUDE.md` closes that: Claude Code loads it **on demand, when it reads
+a file in that directory**, so it costs nothing until something touches the wiki
+and is unavoidable once. Write `<bundle>/CLAUDE.md`:
+
+```markdown
+# This directory is an OKF knowledge bundle
+
+Durable knowledge about this project: decisions and their rationale, invariants,
+domain vocabulary, module boundaries, gotchas. **Not** documentation of the code
+— the code documents itself, and a page restating it is wrong within a week.
+
+**Invoke the `llm-wiki` skill before writing or editing anything here.** It
+carries the frontmatter contract, the concept types, the half-life rule that
+decides what may be written at all, and the index and lint steps that follow
+every edit. Without it you will produce a page that looks fine and is not:
+missing `type`, an unpinned `source_commit`, absent from its index.
+
+Reading needs no skill. Start at `index.md` and drill down; don't read the whole
+bundle. If a page contradicts the code, reality wins — say so rather than reading
+past it.
+
+Three things hold either way:
+
+- `index.md` and `log.md` are reserved names, and `CLAUDE.md` / `AGENTS.md` are
+  instructions. Every other `.md` here is a concept and needs a `type`.
+- Every edit is followed by `okf.py index --write` and `okf.py lint`.
+- A wiki change lands in the same commit as the change it describes.
+```
+
+Then `<bundle>/AGENTS.md`, for hosts that do not read `CLAUDE.md` — pointing
+rather than duplicating, so the two cannot drift:
+
+```markdown
+# AGENTS.md
+
+The instructions for this directory are in [CLAUDE.md](CLAUDE.md). Read it before
+writing anything here.
+
+The `llm-wiki` skill it names is Claude Code's. Without it, follow that file
+directly and stay conservative: copy the frontmatter shape of a neighbouring
+page, and never invent a `type`.
+```
+
+**Its reach has one hole, so do not treat it as a gate.** The file loads when an
+agent reads something in the bundle; an agent that writes a new page without
+reading one first never sees it, and neither mechanism survives a host that reads
+neither file. It converts a rule you had to go looking for into one that arrives
+with the directory — worth having, and not enforcement. A `PreToolUse` hook is
+the only thing that actually blocks; offer one, with `okf.py stale` on
+`SessionStart` for a once-per-session nudge (use the `update-config` skill).
+**Do not install hooks unprompted.**
 
 ### A6 — Query
 
@@ -340,6 +410,8 @@ wiki working exactly as intended; only evidence retires a page.
 
 - `index.md` and `log.md` are **reserved** (§3.1) — never a concept. Only the
   **root** `index.md` may carry frontmatter (§6); `E004` catches the rest.
+  `CLAUDE.md`, `CLAUDE.local.md` and `AGENTS.md` are skipped for a different
+  reason — they are instructions, not knowledge (A5). Nothing else is exempt.
 - `sources` globs are **gitignore syntax** matched against `git ls-files`, so
   untracked files are invisible to coverage. A bare directory expands to
   `dir/**`; any other slash-less pattern (`Makefile`, `*.sql`) expands to
@@ -357,5 +429,7 @@ wiki working exactly as intended; only evidence retires a page.
   than extending them.
 - A page with no `sources` is never stale by construction. That is a feature —
   prefer timeless pages.
-- Don't mirror `CLAUDE.md` into the wiki, or the repo tree into `architecture/`.
-  Both create two sources of truth, which is the one thing a wiki must not do.
+- Don't copy the *project's* `CLAUDE.md` content into concepts, or the repo tree
+  into `architecture/`. Both create two sources of truth, which is the one thing a
+  wiki must not do. The bundle's own `CLAUDE.md` is not that: it says how to edit
+  the bundle and asserts nothing about the project.

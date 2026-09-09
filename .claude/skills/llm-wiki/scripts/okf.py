@@ -32,6 +32,19 @@ import yaml
 # OKF v0.1 §3.1 — reserved at any level of the hierarchy.
 RESERVED = {"index.md", "log.md"}
 
+# Agent instruction files, which a bundle carries so that the rules for editing
+# it arrive with the directory rather than having to be sought out. Claude Code
+# loads a nested CLAUDE.md on demand when it reads a file in that directory, and
+# other agents read AGENTS.md the same way — so an agent that opens a page it was
+# about to edit has been told to load this skill before it does.
+#
+# They are instructions, not knowledge: never concepts, never indexed, never
+# reported stale. The trade is that nothing here checks their links either.
+AGENT_INSTRUCTIONS = {"CLAUDE.md", "CLAUDE.local.md", "AGENTS.md"}
+
+# Every filename that is not a concept, whatever level it sits at.
+NOT_CONCEPTS = RESERVED | AGENT_INSTRUCTIONS
+
 # An index.md containing this marker is hand-curated: `index --write` leaves it
 # alone, and lint treats its links as deliberate (they count against W011).
 MANUAL_MARKER = "<!-- okf:manual -->"
@@ -158,11 +171,12 @@ def derive_title(path: Path) -> str:
 def has_concepts(directory: Path) -> bool:
     """True if any concept (non-reserved, non-hidden .md) lives under `directory`.
 
-    A directory holding only an index.md or log.md carries no knowledge of its
-    own, so indexes neither list it nor expect it to have an index.
+    A directory holding only an index.md, a log.md or an agent instruction file
+    carries no knowledge of its own, so indexes neither list it nor expect it to
+    have an index.
     """
     return any(
-        p.name not in RESERVED
+        p.name not in NOT_CONCEPTS
         and not any(part.startswith(".") for part in p.relative_to(directory).parts)
         for p in directory.rglob("*.md")
     )
@@ -286,6 +300,8 @@ def load_bundle(root: Path, repo: Path) -> Bundle:
     for path in sorted(root.rglob("*.md")):
         if any(part.startswith(".") for part in path.relative_to(root).parts):
             continue
+        if path.name in AGENT_INSTRUCTIONS:
+            continue
         doc = load_doc(path, root)
         if path.name == "index.md":
             bundle.indexes.append(doc)
@@ -408,7 +424,7 @@ def lint(bundle: Bundle) -> tuple[list[dict], list[dict]]:
                 expected = (child / "index.md").resolve()
                 if expected not in linked:
                     warn("W012", index_doc.rel, f"does not link subdirectory `{child.name}/`")
-            elif child.suffix == ".md" and child.name not in RESERVED:
+            elif child.suffix == ".md" and child.name not in NOT_CONCEPTS:
                 if child.resolve() not in linked:
                     warn("W012", index_doc.rel, f"does not link concept `{child.name}`")
 
