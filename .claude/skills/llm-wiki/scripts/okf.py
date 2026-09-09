@@ -357,15 +357,31 @@ def lint(bundle: Bundle) -> tuple[list[dict], list[dict]]:
             continue
         if not is_agent_instructions(path.name):
             continue
-        raw, _ = split_frontmatter(path.read_text(encoding="utf-8"))
-        if raw is not None:
-            rel = "/".join(rel_parts)
-            warn(
-                "W018",
-                rel,
-                "agent instruction file has YAML frontmatter — if this is a concept, "
-                "rename it; nothing else here will report it",
-            )
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            # These names are otherwise never read, so a directory called
+            # CLAUDE.md or a file that is not UTF-8 would take lint down with a
+            # traceback. Neither is a concept in hiding.
+            continue
+        raw, _ = split_frontmatter(text)
+        if raw is None:
+            continue
+        # A `---` opening a horizontal rule is not frontmatter, and an
+        # instruction file is prose that may well start with one. Only a block
+        # that parses as a mapping is evidence of a masked concept.
+        try:
+            meta = yaml.safe_load(raw)
+        except yaml.YAMLError:
+            meta = None
+        if not isinstance(meta, dict):
+            continue
+        warn(
+            "W018",
+            "/".join(rel_parts),
+            "agent instruction file has YAML frontmatter — if this is a concept, "
+            "rename it and fix its inbound links; nothing else here reports it",
+        )
 
     # §9.1/§9.2 — concept conformance.
     for doc in bundle.concepts:

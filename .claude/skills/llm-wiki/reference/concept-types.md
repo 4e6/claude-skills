@@ -6,8 +6,10 @@
   directory. Ordered by half-life, highest first.
 - **`Decision` or `Module`?** — the distinction most often got wrong, and the test
   that settles it.
-- **Templates**, one per type: Decision (ADR), Invariant, Module, Gotcha,
-  Playbook, Glossary Term, Open Question.
+- **Templates** for seven of the twelve types: Decision (ADR), Invariant, Module,
+  Gotcha, Playbook, Glossary Term, Open Question. The rest — `Integration`,
+  `Data Model`, `Convention`, `Overview`, `Reference` — have none; follow the
+  frontmatter contract and the nearest template.
 
 OKF leaves `type` free-form (§4.1). This is the vocabulary this skill uses. Stick
 to it unless the project genuinely needs a new kind — a consistent `type` set is

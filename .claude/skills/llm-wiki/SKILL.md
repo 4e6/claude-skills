@@ -140,7 +140,7 @@ superseded_by: /decisions/0009-mtls.md
 The bundle may also hold `CLAUDE.md`, `CLAUDE.local.md` and `AGENTS.md`, which
 carry no frontmatter and are not concepts. That is a **deviation from OKF §3.1**,
 not an extension of it, and it is written down in
-[reference/okf-v0.1.md](okf-v0.1.md) beside the clause it breaks.
+[reference/okf-v0.1.md](reference/okf-v0.1.md) beside the clause it breaks.
 
 `sources` + `source_commit` are the entire sync mechanism. A page with `sources`
 can be checked against git; a page without them (a `Gotcha`, a `Glossary Term`)
@@ -290,13 +290,18 @@ cannot derive. An `index.md` containing `<!-- okf:manual -->` is left untouched.
 
 `lint` enforces OKF §9 conformance (`E…`) and reports rot (`W…`): broken links,
 orphans, concepts missing from their index, directories with no index, absent
-`description`/`timestamp`. Errors mean the bundle is non-conformant — fix them.
+`description`/`timestamp`, and `W018` — a concept hidden behind an instruction
+file's name (A5). Errors mean the bundle is non-conformant — fix them.
 Warnings are judgement: `W010` on a deliberate forward reference is fine.
 
 ### A5 — Wire up the read and write paths
 
-Three files, doing two different jobs. Run this on bootstrap, and on any existing
-bundle that predates it — the files are additive and nothing else has to change.
+Three files, doing two different jobs. Run it on bootstrap, and on any existing
+bundle that predates it — **but on an existing bundle, check for a collision
+first**: a page already named `CLAUDE.md` or `AGENTS.md` stops being a concept
+the moment these rules apply to it. `okf.py lint` names them (`W018`), and
+[reference/bundle-instructions.md](reference/bundle-instructions.md) opens with
+the check.
 
 #### The read path: the project's `CLAUDE.md`
 
@@ -325,7 +330,7 @@ path and that rule. A trigger list in it — *a boundary, a decision, an
 invariant…* — only duplicates this skill's own `description`, and the word
 *decision* sitting in it reads as naming a destination rather than an occasion;
 which section a page belongs in is
-[reference/concept-types.md](concept-types.md)'s job.
+[reference/concept-types.md](reference/concept-types.md)'s job.
 
 #### The write path: `CLAUDE.md` and `AGENTS.md` **inside** the bundle
 
@@ -344,10 +349,13 @@ what they reach are in
 when running A5, and not otherwise.
 
 It is a nudge and not a gate: only a `PreToolUse` hook can actually refuse a
-write. Offer one if the user wants enforcement — matching `Edit|Write` with an
-`if:` on the bundle path, denying until this skill is loaded — alongside
-`SessionStart` running `okf.py stale` for a once-per-session nudge, and use the
-`update-config` skill to install either. **Do not install hooks unprompted.**
+write. Offer one if the user wants enforcement — `Edit|Write`, an `if:` on the
+bundle path, denying with a reason that names this skill. **Nothing tells a hook
+which skills are loaded**, so "only until it is loaded" needs state the hook
+keeps itself, such as a marker file keyed by `session_id`; without that it denies
+every write and the design is the user's call, not this skill's. `SessionStart`
+running `okf.py stale` is the cheaper half. Use the `update-config` skill to
+install either, and **do not install hooks unprompted.**
 Claude Code's `.claude/rules/` with `paths:` frontmatter fires on the same
 trigger and is worth naming as the alternative; it lives outside the bundle, so
 it does not travel with a copied one and does nothing for other hosts.

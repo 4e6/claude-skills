@@ -4,14 +4,32 @@ Two files written **into** the bundle by A5, so that the rules for editing it
 arrive with the directory instead of having to be sought out. Read this file when
 running A5; it is not needed for any other operation.
 
+## Contents
+
+- **Before writing either one** — the collision check, which is a `lint` run and
+  not an `ls`, and what to do with each kind of file it finds.
+- **`<bundle>/CLAUDE.md`** — the template.
+- **`<bundle>/AGENTS.md`** — the template, which points at the first rather than
+  repeating it.
+- **What they reach, and what they do not** — three ways the mechanism does not
+  fire, and why a generated index cannot link them.
+
 ## Before writing either one
 
-**Check for a collision first.** A bundle that predates A5 may already hold a
-concept at one of these paths, or a hand-customised instruction file:
+**Check for a collision first**, and check it with `lint` rather than by eye. A
+bundle that predates A5 may already hold a concept at one of these names, at any
+depth and in any case — `architecture/agents.md` is an ordinary page name under
+this skill's own kebab-case convention, and it stops being a concept the moment
+these rules apply to it:
 
 ```sh
-ls <bundle>/CLAUDE.md <bundle>/AGENTS.md 2>/dev/null
+"$OKF/.venv/bin/python" "$OKF/okf.py" --bundle "$WIKI" lint     # read every W018
 ```
+
+`ls` is the wrong instrument: the exempt names are three, not two, the match is
+case-insensitive, and a collision three directories down is the likely one.
+**Run `lint` before `index --write`, not in A4's order** — by the time A4's
+warning prints, its own `index --write` has already dropped the page's entry.
 
 * **A file with YAML frontmatter is a concept**, not instructions. `okf.py` skips
   these names, so it would drop out of the index, out of `stale`, and out of the
@@ -67,15 +85,25 @@ directly and stay conservative: copy the frontmatter shape of a neighbouring
 page, and never invent a `type`.
 ````
 
-## Two things about their reach
+## What they reach, and what they do not
 
 **Only Claude Code loads either automatically**, and only `CLAUDE.md` — a nested
 one is read when Claude reads *any* file at or below that directory, which is what
 makes a single file at the bundle root cover every concept under it. `AGENTS.md`
 is for hosts that read that name instead; a host that reads neither gets nothing.
-An agent that writes a new page without reading one first also gets nothing. This
-converts a rule you had to go looking for into one that arrives with the
-directory — it is not a gate.
+
+Three ways it does not fire, and the third is the largest:
+
+* An agent that **writes a new page without reading one first** never triggers it.
+* A host that reads neither filename gets nothing, by construction.
+* **Only the file-reading tools trigger it, not `cat`, `sed` or `grep`.** An agent
+  told to prefer shell commands for file work — an increasingly common
+  instruction, and the one under which a bundle is most likely to be edited by
+  `sed -i` or a heredoc — never loads the file at all. That is the write path,
+  which is the path this exists to close.
+
+So it converts a rule you had to go looking for into one that arrives with the
+directory. It is not a gate, and only a `PreToolUse` hook is.
 
 **Do not link them from a generated `index.md`.** `index --write` renders indexes
 from concept frontmatter, so a hand-added link to either file is stripped on the
