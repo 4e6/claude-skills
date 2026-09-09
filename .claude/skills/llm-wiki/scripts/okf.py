@@ -32,6 +32,34 @@ import yaml
 # OKF v0.1 §3.1 — reserved at any level of the hierarchy.
 RESERVED = {"index.md", "log.md"}
 
+# Agent instruction files, which a bundle carries so that the rules for editing
+# it arrive with the directory rather than having to be sought out. Claude Code
+# loads a nested CLAUDE.md on demand when it reads a file in that directory, and
+# other agents read AGENTS.md the same way — so an agent that opens a page it was
+# about to edit has been told to load this skill before it does.
+#
+# They are instructions, not knowledge: never concepts, never indexed, never
+# reported stale. The trade is that nothing here checks their links either.
+AGENT_INSTRUCTIONS = {"claude.md", "claude.local.md", "agents.md"}
+
+
+def is_agent_instructions(name: str) -> bool:
+    """Case-insensitively, is this an agent instruction file?
+
+    Matched on the casefolded name because the hosts that read these files are
+    doing so on case-insensitive filesystems: a file written as `claude.md` on
+    macOS or Windows *is* `CLAUDE.md` to the agent that loads it. An exact-case
+    check would call the same file instructions in one place and a malformed
+    concept in the other, and the mismatch shows up on the path A5 is most
+    likely to hit — an existing bundle whose files this skill did not write.
+    """
+    return name.casefold() in AGENT_INSTRUCTIONS
+
+
+def is_concept_file(name: str) -> bool:
+    """Every `.md` that is neither OKF-reserved nor an instruction file."""
+    return name not in RESERVED and not is_agent_instructions(name)
+
 # An index.md containing this marker is hand-curated: `index --write` leaves it
 # alone, and lint treats its links as deliberate (they count against W011).
 MANUAL_MARKER = "<!-- okf:manual -->"
@@ -158,11 +186,12 @@ def derive_title(path: Path) -> str:
 def has_concepts(directory: Path) -> bool:
     """True if any concept (non-reserved, non-hidden .md) lives under `directory`.
 
-    A directory holding only an index.md or log.md carries no knowledge of its
-    own, so indexes neither list it nor expect it to have an index.
+    A directory holding only an index.md, a log.md or an agent instruction file
+    carries no knowledge of its own, so indexes neither list it nor expect it to
+    have an index.
     """
     return any(
-        p.name not in RESERVED
+        is_concept_file(p.name)
         and not any(part.startswith(".") for part in p.relative_to(directory).parts)
         for p in directory.rglob("*.md")
     )
@@ -286,6 +315,8 @@ def load_bundle(root: Path, repo: Path) -> Bundle:
     for path in sorted(root.rglob("*.md")):
         if any(part.startswith(".") for part in path.relative_to(root).parts):
             continue
+        if is_agent_instructions(path.name):
+            continue
         doc = load_doc(path, root)
         if path.name == "index.md":
             bundle.indexes.append(doc)
@@ -314,6 +345,43 @@ def lint(bundle: Bundle) -> tuple[list[dict], list[dict]]:
 
     def warn(code, rel, msg):
         warnings.append({"code": code, "file": rel, "message": msg})
+
+    # An instruction file that carries frontmatter is almost certainly a concept
+    # that has been masked: `load_bundle` skips these names, so such a page drops
+    # out of the count, out of `stale`, and — silently, at exit 0 — out of its
+    # index on the next `index --write`. The frontmatter is the tell, because a
+    # real instruction file has none.
+    for path in sorted(bundle.root.rglob("*.md")):
+        rel_parts = path.relative_to(bundle.root).parts
+        if any(part.startswith(".") for part in rel_parts):
+            continue
+        if not is_agent_instructions(path.name):
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            # These names are otherwise never read, so a directory called
+            # CLAUDE.md or a file that is not UTF-8 would take lint down with a
+            # traceback. Neither is a concept in hiding.
+            continue
+        raw, _ = split_frontmatter(text)
+        if raw is None:
+            continue
+        # A `---` opening a horizontal rule is not frontmatter, and an
+        # instruction file is prose that may well start with one. Only a block
+        # that parses as a mapping is evidence of a masked concept.
+        try:
+            meta = yaml.safe_load(raw)
+        except yaml.YAMLError:
+            meta = None
+        if not isinstance(meta, dict):
+            continue
+        warn(
+            "W018",
+            "/".join(rel_parts),
+            "agent instruction file has YAML frontmatter — if this is a concept, "
+            "rename it and fix its inbound links; nothing else here reports it",
+        )
 
     # §9.1/§9.2 — concept conformance.
     for doc in bundle.concepts:
@@ -408,7 +476,7 @@ def lint(bundle: Bundle) -> tuple[list[dict], list[dict]]:
                 expected = (child / "index.md").resolve()
                 if expected not in linked:
                     warn("W012", index_doc.rel, f"does not link subdirectory `{child.name}/`")
-            elif child.suffix == ".md" and child.name not in RESERVED:
+            elif child.suffix == ".md" and is_concept_file(child.name):
                 if child.resolve() not in linked:
                     warn("W012", index_doc.rel, f"does not link concept `{child.name}`")
 
