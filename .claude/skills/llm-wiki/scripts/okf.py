@@ -40,10 +40,25 @@ RESERVED = {"index.md", "log.md"}
 #
 # They are instructions, not knowledge: never concepts, never indexed, never
 # reported stale. The trade is that nothing here checks their links either.
-AGENT_INSTRUCTIONS = {"CLAUDE.md", "CLAUDE.local.md", "AGENTS.md"}
+AGENT_INSTRUCTIONS = {"claude.md", "claude.local.md", "agents.md"}
 
-# Every filename that is not a concept, whatever level it sits at.
-NOT_CONCEPTS = RESERVED | AGENT_INSTRUCTIONS
+
+def is_agent_instructions(name: str) -> bool:
+    """Case-insensitively, is this an agent instruction file?
+
+    Matched on the casefolded name because the hosts that read these files are
+    doing so on case-insensitive filesystems: a file written as `claude.md` on
+    macOS or Windows *is* `CLAUDE.md` to the agent that loads it. An exact-case
+    check would call the same file instructions in one place and a malformed
+    concept in the other, and the mismatch shows up on the path A5 is most
+    likely to hit — an existing bundle whose files this skill did not write.
+    """
+    return name.casefold() in AGENT_INSTRUCTIONS
+
+
+def is_concept_file(name: str) -> bool:
+    """Every `.md` that is neither OKF-reserved nor an instruction file."""
+    return name not in RESERVED and not is_agent_instructions(name)
 
 # An index.md containing this marker is hand-curated: `index --write` leaves it
 # alone, and lint treats its links as deliberate (they count against W011).
@@ -176,7 +191,7 @@ def has_concepts(directory: Path) -> bool:
     have an index.
     """
     return any(
-        p.name not in NOT_CONCEPTS
+        is_concept_file(p.name)
         and not any(part.startswith(".") for part in p.relative_to(directory).parts)
         for p in directory.rglob("*.md")
     )
@@ -300,7 +315,7 @@ def load_bundle(root: Path, repo: Path) -> Bundle:
     for path in sorted(root.rglob("*.md")):
         if any(part.startswith(".") for part in path.relative_to(root).parts):
             continue
-        if path.name in AGENT_INSTRUCTIONS:
+        if is_agent_instructions(path.name):
             continue
         doc = load_doc(path, root)
         if path.name == "index.md":
@@ -330,6 +345,27 @@ def lint(bundle: Bundle) -> tuple[list[dict], list[dict]]:
 
     def warn(code, rel, msg):
         warnings.append({"code": code, "file": rel, "message": msg})
+
+    # An instruction file that carries frontmatter is almost certainly a concept
+    # that has been masked: `load_bundle` skips these names, so such a page drops
+    # out of the count, out of `stale`, and — silently, at exit 0 — out of its
+    # index on the next `index --write`. The frontmatter is the tell, because a
+    # real instruction file has none.
+    for path in sorted(bundle.root.rglob("*.md")):
+        rel_parts = path.relative_to(bundle.root).parts
+        if any(part.startswith(".") for part in rel_parts):
+            continue
+        if not is_agent_instructions(path.name):
+            continue
+        raw, _ = split_frontmatter(path.read_text(encoding="utf-8"))
+        if raw is not None:
+            rel = "/".join(rel_parts)
+            warn(
+                "W018",
+                rel,
+                "agent instruction file has YAML frontmatter — if this is a concept, "
+                "rename it; nothing else here will report it",
+            )
 
     # §9.1/§9.2 — concept conformance.
     for doc in bundle.concepts:
@@ -424,7 +460,7 @@ def lint(bundle: Bundle) -> tuple[list[dict], list[dict]]:
                 expected = (child / "index.md").resolve()
                 if expected not in linked:
                     warn("W012", index_doc.rel, f"does not link subdirectory `{child.name}/`")
-            elif child.suffix == ".md" and child.name not in NOT_CONCEPTS:
+            elif child.suffix == ".md" and is_concept_file(child.name):
                 if child.resolve() not in linked:
                     warn("W012", index_doc.rel, f"does not link concept `{child.name}`")
 

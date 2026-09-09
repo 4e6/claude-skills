@@ -40,7 +40,7 @@ Rank every candidate fact by half-life. Write the top half; refuse the bottom:
 | Module responsibility and boundaries | Restated code comments |
 | Gotchas, sharp edges, "we tried that, it failed" | Step-by-step code walkthroughs |
 | Operational playbooks and their verification steps | Dependency version numbers |
-| Third-party quirks discovered the hard way | Content already in `CLAUDE.md` |
+| Third-party quirks discovered the hard way | Content already in the *project's* `CLAUDE.md` |
 | What is still unknown (`Open Question`) | Speculation stated as fact |
 
 When unsure, apply the test: *would this page still be correct after a big
@@ -110,10 +110,11 @@ what lets a single commit change behaviour and the knowledge about it together.
 Create directories lazily — only when a real page needs one. An empty
 `gotchas/` teaches nothing.
 
-`CLAUDE.md` and `AGENTS.md` are instructions rather than knowledge, so `okf.py`
-ignores them at every level: they are never concepts, never indexed, never stale.
-Everything else ending in `.md` **is** a concept — there is no third category, and
-a stray notes file in the bundle will be linted as a page missing its `type`.
+`CLAUDE.md`, `CLAUDE.local.md` and `AGENTS.md` are instructions rather than
+knowledge, so `okf.py` ignores them at every level and in any case: never
+concepts, never indexed, never stale. With `index.md` and `log.md` that is the
+whole exempt list — every other `.md` in a bundle is a concept, and a stray notes
+file will be linted as a page missing its `type`.
 
 ## Frontmatter contract
 
@@ -135,6 +136,11 @@ status: accepted                # Decision / Open Question only
 superseded_by: /decisions/0009-mtls.md
 ---
 ```
+
+The bundle may also hold `CLAUDE.md`, `CLAUDE.local.md` and `AGENTS.md`, which
+carry no frontmatter and are not concepts. That is a **deviation from OKF §3.1**,
+not an extension of it, and it is written down in
+[reference/okf-v0.1.md](okf-v0.1.md) beside the clause it breaks.
 
 `sources` + `source_commit` are the entire sync mechanism. A page with `sources`
 can be checked against git; a page without them (a `Gotcha`, a `Glossary Term`)
@@ -325,61 +331,26 @@ which section a page belongs in is
 
 The read path tells an agent the wiki exists. It does not reach the agent that is
 already editing a page — one asked to fix a stale sentence, or landing a wiki
-update alongside a code change. That agent needs the frontmatter contract, the
-concept types and the index/lint steps, and it has no reason to know this skill
-is what carries them.
+update beside a code change. That agent needs the frontmatter contract, the
+concept types and the index/lint steps, and has no reason to know this skill
+carries them.
 
-A nested `CLAUDE.md` closes that: Claude Code loads it **on demand, when it reads
-a file in that directory**, so it costs nothing until something touches the wiki
-and is unavoidable once. Write `<bundle>/CLAUDE.md`:
+Two files in the bundle close most of that gap, because Claude Code loads a
+nested `CLAUDE.md` on demand when it reads any file at or below that directory:
+the rules arrive with the directory, and cost nothing until something touches it.
+**Both templates, the collision check that must precede them, and the limits of
+what they reach are in
+[reference/bundle-instructions.md](reference/bundle-instructions.md)** — read it
+when running A5, and not otherwise.
 
-```markdown
-# This directory is an OKF knowledge bundle
-
-Durable knowledge about this project: decisions and their rationale, invariants,
-domain vocabulary, module boundaries, gotchas. **Not** documentation of the code
-— the code documents itself, and a page restating it is wrong within a week.
-
-**Invoke the `llm-wiki` skill before writing or editing anything here.** It
-carries the frontmatter contract, the concept types, the half-life rule that
-decides what may be written at all, and the index and lint steps that follow
-every edit. Without it you will produce a page that looks fine and is not:
-missing `type`, an unpinned `source_commit`, absent from its index.
-
-Reading needs no skill. Start at `index.md` and drill down; don't read the whole
-bundle. If a page contradicts the code, reality wins — say so rather than reading
-past it.
-
-Three things hold either way:
-
-- `index.md` and `log.md` are reserved names, and `CLAUDE.md` / `AGENTS.md` are
-  instructions. Every other `.md` here is a concept and needs a `type`.
-- Every edit is followed by `okf.py index --write` and `okf.py lint`.
-- A wiki change lands in the same commit as the change it describes.
-```
-
-Then `<bundle>/AGENTS.md`, for hosts that do not read `CLAUDE.md` — pointing
-rather than duplicating, so the two cannot drift:
-
-```markdown
-# AGENTS.md
-
-The instructions for this directory are in [CLAUDE.md](CLAUDE.md). Read it before
-writing anything here.
-
-The `llm-wiki` skill it names is Claude Code's. Without it, follow that file
-directly and stay conservative: copy the frontmatter shape of a neighbouring
-page, and never invent a `type`.
-```
-
-**Its reach has one hole, so do not treat it as a gate.** The file loads when an
-agent reads something in the bundle; an agent that writes a new page without
-reading one first never sees it, and neither mechanism survives a host that reads
-neither file. It converts a rule you had to go looking for into one that arrives
-with the directory — worth having, and not enforcement. A `PreToolUse` hook is
-the only thing that actually blocks; offer one, with `okf.py stale` on
-`SessionStart` for a once-per-session nudge (use the `update-config` skill).
-**Do not install hooks unprompted.**
+It is a nudge and not a gate: only a `PreToolUse` hook can actually refuse a
+write. Offer one if the user wants enforcement — matching `Edit|Write` with an
+`if:` on the bundle path, denying until this skill is loaded — alongside
+`SessionStart` running `okf.py stale` for a once-per-session nudge, and use the
+`update-config` skill to install either. **Do not install hooks unprompted.**
+Claude Code's `.claude/rules/` with `paths:` frontmatter fires on the same
+trigger and is worth naming as the alternative; it lives outside the bundle, so
+it does not travel with a copied one and does nothing for other hosts.
 
 ### A6 — Query
 

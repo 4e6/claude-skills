@@ -6,6 +6,13 @@ Distilled from the spec at
 sharing](https://cloud.google.com/blog/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing/)).
 Kept here so the skill works offline. Section numbers match the upstream spec.
 
+## Contents
+
+- §2 Terminology · §3.1 Reserved filenames (**and this skill's one declared
+  deviation from it**) · §4.1 Frontmatter · §4.2 Body
+- §5 Cross-linking · §6 Index files · §7 Log files · §8 Citations
+- §9 Conformance · §11 Versioning · Non-goals (§1)
+
 OKF is deliberately tiny: *a directory of markdown files with YAML frontmatter*.
 No schema registry, no central authority, no required tooling.
 
@@ -22,6 +29,14 @@ No schema registry, no central authority, no required tooling.
 
 `index.md` and `log.md` have defined meaning at **any** level of the tree and
 MUST NOT be used as concept documents. Every other `.md` file is a concept.
+
+> **This skill deviates here, knowingly.** It also exempts `CLAUDE.md`,
+> `CLAUDE.local.md` and `AGENTS.md` at any level, so that a bundle can carry the
+> instructions for editing it (see A5). By §3.1 those are concepts, and an
+> unfrontmattered one fails §9.1 — so a bundle this skill considers clean is one
+> a strict OKF consumer would reject with two untyped concepts. `okf.py` still
+> prints *conformant with OKF v0.1*, which is a statement about everything the
+> spec covers **minus this exemption**. Nothing else is exempt.
 
 ## §4.1 Frontmatter
 
