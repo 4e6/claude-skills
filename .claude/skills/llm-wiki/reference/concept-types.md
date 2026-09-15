@@ -4,8 +4,8 @@
 
 - **The type table** below — every `type`, its half-life, what it answers, and its
   directory. Ordered by half-life, highest first.
-- **`Decision` or `Module`?** — the distinction most often got wrong, and the test
-  that settles it.
+- **`Decision` or `Module`?** — the distinction most often got wrong, the tests
+  that settle it, and the common case that is neither.
 - **Templates** for seven of the twelve types: Decision (ADR), Invariant, Module,
   Gotcha, Playbook, Glossary Term, Open Question. The rest — `Integration`,
   `Data Model`, `Convention`, `Overview`, `Reference` — have none; follow the
@@ -29,7 +29,7 @@ that is a strong hint it belongs in the code, not the wiki.
 | `Data Model` | months | *What is stored, and what does it mean?* | `domain/` |
 | `Playbook` | months | *How do I do this operational task?* | `playbooks/` |
 | `Convention` | months | *How do we write code here?* | `conventions/` |
-| `Module` | weeks | *What is this subsystem for, and where are its edges?* | `architecture/` |
+| `Module` | weeks | *What is this for, where are its edges, and why is it shaped so?* | `architecture/` |
 | `Overview` | weeks | *What is this project?* | bundle root |
 | `Open Question` | short | *What don't we know yet?* | `questions/` |
 | `Reference` | — | mirrored external material backing a citation | `references/` |
@@ -43,7 +43,7 @@ boundaries**, never about function signatures.
 The two most-confused types, and the confusion runs one way: `decisions/` gets
 reached for by default, because the word *decision* appears in the trigger list
 of almost every prompt about recording knowledge. Being a trigger does not make
-it a destination. Two rules settle nearly every case.
+it a destination. Four rules settle nearly every case.
 
 **A `Decision` is written about something that already happened.** It records a
 fork taken, under the constraints in play at the time, and it is dated and
@@ -52,13 +52,39 @@ that has not been built is a plan with a permanent number on it, and the number
 outlives the plan changing. If no live alternative existed that somebody might
 re-litigate, it is not a decision — whatever else it is.
 
+**Changing something already decided is usually neither.** The two rules above
+sort *new* work, and most work is not new. The test is entailment: **does a page
+already commit the project to this outcome?** If it does, the work implements
+that decision rather than taking one — fixing a bug that made an existing
+decision untrue ends with the project doing what was already written down.
+Weighing alternatives is not deciding either: refusing to overturn a decision
+leaves it standing, and a page recording that refusal adds a number to the ledger
+without adding a fork to it.
+
+Entailment rather than *did anything change*, because plenty changes without a
+fork being taken. **Narrowing or widening what an existing decision governs is a
+fork and does get an ADR** — the earlier page did not commit the project to the
+new scope. Changing which cases fall which side of a rule it already governs is
+not: that is the same rule meeting better inputs, and it is what "already
+determined" means. When the answer is "already determined", the rule that now has
+to hold is an `Invariant`, and the argument for the behaviour belongs to the page
+that owns the surface.
+
 **A new surface is a `Module`, and often a `Module` *and* the decisions behind
 it.** The page says what the thing is, what it owns and where it stops; the ADRs
 say why it is not the alternative. Describing and justifying are different jobs,
 and a `Module` that re-argues its own ADRs — or a `Decision` that inventories a
 surface — is doing the other one badly. Link them instead: the module names its
-decisions in a short section and delegates every *why* to them, so neither page
+decisions in a short section and delegates its *forks* to them, so neither page
 repeats the other and superseding one does not strand the other.
+
+**Delegating forks is not delegating every why.** A `Module` carries the argument
+for behaviour nobody forked over — why the boundary falls there, which case it
+was drawn around, what it costs. Only an argument with a fork behind it
+delegates, and the rules above are what decide that; a live alternative is
+necessary for a `Decision`, never sufficient for one. Read instead as *send all
+rationale to an ADR*, this leaves an author holding an argument with nowhere to
+put it but a new number.
 
 ---
 
@@ -139,8 +165,8 @@ Customers are double-charged. See [refund playbook](/playbooks/refunds.md).
 
 Responsibility and edges. **No signatures, no line numbers, no file trees** —
 those are what the code is for, and they rot within days. Name the decisions
-behind the surface and let them carry the *why*; see [`Decision` or
-`Module`?](#decision-or-module).
+behind the surface and let them carry the forks; keep the reasoning no fork was
+taken over. See [`Decision` or `Module`?](#decision-or-module).
 
 ```markdown
 ---

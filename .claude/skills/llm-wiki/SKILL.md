@@ -206,7 +206,10 @@ Triggered by "document X", "record this decision", or by you noticing a durable
 fact during other work.
 
 1. Decide the `type` from [reference/concept-types.md](reference/concept-types.md).
-   If nothing fits, it probably fails the half-life rule.
+   If nothing fits, it probably fails the half-life rule. **Read that file rather
+   than picking off the Layout tree above** — it lists the directories, which is
+   enough to choose wrongly and not enough to choose well, and `Decision` is the
+   one that gets over-applied.
 2. Check for an existing page first — **update in place rather than adding a
    near-duplicate**. Two pages that disagree are the main failure mode of a wiki.
 3. Write the page: a `description` inside L0's budget and a body that stops at L1.
@@ -221,6 +224,12 @@ fact during other work.
 `Decision` pages are append-only. To reverse one, write a new ADR, set the old
 page's `status: superseded` and `superseded_by:`, and leave its reasoning intact.
 The record of a wrong decision is worth more than its deletion.
+
+**A landed page stays, whatever it turns out to record.** The only one you may
+remove is one you added and have not landed — and not for free either: every
+inbound link, and every page edited to point at it, comes back out. That cost is
+paid when the page is written rather than when it lands, which is the argument
+for choosing the type first.
 
 ### A3 — Sync with the code (the important one)
 
