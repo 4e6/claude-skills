@@ -44,8 +44,10 @@ warning prints, its own `index --write` has already dropped the page's entry.
 ````markdown
 # This directory is an OKF knowledge bundle
 
-Durable knowledge about this project: decisions and their rationale, invariants,
-domain vocabulary, module boundaries, gotchas. **Not** documentation of the code
+Durable knowledge about this project: why things are the way they are, what must
+hold, what words mean here, where the boundaries fall, and what bites people.
+Which of those is a `Decision` is `reference/concept-types.md`'s to say, and it
+is the type that gets over-applied. **Not** documentation of the code
 — the code documents itself, and a page restating it is wrong within a week.
 
 **Invoke the `llm-wiki` skill before writing or editing anything here.** It

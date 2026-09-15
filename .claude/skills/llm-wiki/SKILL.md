@@ -37,7 +37,7 @@ Rank every candidate fact by half-life. Write the top half; refuse the bottom:
 | Why a decision was made, what was rejected, what it cost | Function/class signatures, parameter lists |
 | Invariants and the consequence of violating them | File trees, directory listings, line numbers |
 | Domain vocabulary as *this project* uses it | Anything `git log` answers ("added in v2") |
-| Module responsibility and boundaries | Restated code comments |
+| Module responsibility, boundaries, and why it is shaped so | Restated code comments |
 | Gotchas, sharp edges, "we tried that, it failed" | Step-by-step code walkthroughs |
 | Operational playbooks and their verification steps | Dependency version numbers |
 | Third-party quirks discovered the hard way | Content already in the *project's* `CLAUDE.md` |
@@ -134,6 +134,8 @@ sources: [src/auth/**]          # repo-relative gitignore-syntax globs — the p
 source_commit: 4f2a1c9e…        # commit at which `sources` was last actually read
 status: accepted                # Decision / Open Question only
 superseded_by: /decisions/0009-mtls.md
+amends: [0004-tokens.md]        # Decision only — the pages this one revises in part
+amended_by: [0009-mtls.md]      # the mirror, on the revised page. `status: amended`
 ---
 ```
 
@@ -206,10 +208,9 @@ Triggered by "document X", "record this decision", or by you noticing a durable
 fact during other work.
 
 1. Decide the `type` from [reference/concept-types.md](reference/concept-types.md).
-   If nothing fits, it probably fails the half-life rule. **Read that file rather
-   than picking off the Layout tree above** — it lists the directories, which is
-   enough to choose wrongly and not enough to choose well, and `Decision` is the
-   one that gets over-applied.
+   If nothing fits, it probably fails the half-life rule. **The Layout tree above
+   is not a substitute**: it names every type and its directory, which is enough
+   to choose wrongly. `Decision` is the one that gets over-applied.
 2. Check for an existing page first — **update in place rather than adding a
    near-duplicate**. Two pages that disagree are the main failure mode of a wiki.
 3. Write the page: a `description` inside L0's budget and a body that stops at L1.
@@ -225,11 +226,21 @@ fact during other work.
 page's `status: superseded` and `superseded_by:`, and leave its reasoning intact.
 The record of a wrong decision is worth more than its deletion.
 
-**A landed page stays, whatever it turns out to record.** The only one you may
-remove is one you added and have not landed — and not for free either: every
-inbound link, and every page edited to point at it, comes back out. That cost is
-paid when the page is written rather than when it lands, which is the argument
-for choosing the type first.
+**Revising one in part is not reversing it.** Use `status: amended` and the
+`amends`/`amended_by` pair, which `okf.py` treats differently on purpose: an
+amended decision still governs, so `index` leaves it among the live pages where
+`superseded` sinks it under *No longer current*. Marking a still-governing
+decision `superseded` hides a live answer.
+
+**That holds for a mis-filed one too**: a `Decision` that turns out to record no
+fork is still a page somebody has read and linked, so correct it in place — the
+way a decision overtaken by events is corrected — rather than removing it. The
+exception is narrow and is about your own working copy: a page you added and have
+not merged, you may simply take back out. Not for free either, since every
+inbound link and every page edited to point at it comes back out with it — a cost
+paid when the page was written, which is the argument for choosing the type
+first. (This is the one removal `decisions/` allows; A6's *retire* covers every
+other type.)
 
 ### A3 — Sync with the code (the important one)
 
